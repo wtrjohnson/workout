@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock, Repeat2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
 import { demoSessions } from "@/lib/training/data";
@@ -118,6 +119,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
         nextLabel={nextStep ? getExercise(swaps[nextStep.planned.exerciseId] ?? nextStep.planned.exerciseId).name : "Scorecard"}
         nextSet={nextStep ? nextStep.setIndex + 1 : null}
         onAddTime={() => setRemainingRest((current) => current + 30)}
+        onRemoveTime={() => setRemainingRest((current) => Math.max(0, current - 30))}
         onSkip={goToNextStep}
       />
     );
@@ -145,7 +147,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
           </h2>
         </button>
         <p className="mono-copy mt-3 text-sm text-label">
-          Set {activeStep.setIndex + 1} of {activeStep.planned.targetSets} · tap name for form cues
+          Set {activeStep.setIndex + 1} of {activeStep.planned.targetSets}
         </p>
       </section>
 
@@ -287,6 +289,7 @@ function RestScreen({
   nextLabel,
   nextSet,
   onAddTime,
+  onRemoveTime,
   onSkip
 }: {
   remainingRest: number;
@@ -294,6 +297,7 @@ function RestScreen({
   nextLabel: string;
   nextSet: number | null;
   onAddTime: () => void;
+  onRemoveTime: () => void;
   onSkip: () => void;
 }) {
   const progress = Math.max(0, Math.min(100, Math.round((remainingRest / restSeconds) * 100)));
@@ -318,12 +322,15 @@ function RestScreen({
         </svg>
         <p className="mono-copy text-5xl leading-none text-ink">{formatSeconds(remainingRest)}</p>
       </div>
-      <div className="mt-10 flex justify-center gap-4">
-        <button className="tap-target rounded-3xl border border-black/8 bg-white px-5 py-3 text-xl font-black leading-none text-ink shadow-card" onClick={onAddTime} type="button">
-          +30 sec
+      <div className="mt-10 flex justify-center gap-2">
+        <button className="tap-target rounded-3xl border border-black/8 bg-white px-4 py-3 text-lg font-black leading-none text-ink shadow-card" onClick={onRemoveTime} type="button">
+          −30
         </button>
-        <button className="tap-target rounded-3xl bg-ink px-5 py-3 text-xl font-black leading-none text-white shadow-card" onClick={onSkip} type="button">
-          skip rest
+        <button className="tap-target rounded-3xl border border-black/8 bg-white px-4 py-3 text-lg font-black leading-none text-ink shadow-card" onClick={onAddTime} type="button">
+          +30
+        </button>
+        <button className="tap-target rounded-3xl bg-ink px-4 py-3 text-lg font-black leading-none text-white shadow-card" onClick={onSkip} type="button">
+          skip
         </button>
       </div>
       <div className="mt-auto flex items-baseline gap-4 pb-2">
@@ -462,9 +469,12 @@ function WorkoutScorecard({ loggedSets, totalSets }: { loggedSets: LoggedSet[]; 
         <ScoreMetric label="Sets logged" value={`${loggedSets.length}/${totalSets}`} />
         <ScoreMetric label="Volume" value={`${Math.round(totalVolume).toLocaleString()} lb`} />
       </div>
-      <p className="mt-5 text-sm leading-6 text-label">
-        Prototype logging is complete for this session. The next persistence pass can save these exact completed sets to Neon.
-      </p>
+      <Link
+        href="/"
+        className="mt-5 flex w-full items-center justify-center rounded-3xl bg-ink py-4 text-lg font-black text-white shadow-card"
+      >
+        Back to home
+      </Link>
     </section>
   );
 }

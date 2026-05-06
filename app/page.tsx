@@ -2,16 +2,12 @@ import { ArrowRight, Flame } from "lucide-react";
 import Link from "next/link";
 import { BottomNav } from "@/components/bottom-nav";
 import { WeeklySetsChart, LoadTrendChart } from "@/components/home-charts";
-import { demoSessions } from "@/lib/training/data";
+import { LiftProgressChart } from "@/components/progress-charts";
+import { demoSessions, exercises } from "@/lib/training/data";
 import { generateInsights, getTodayWorkout, getWeeklySummary, suggestProgression } from "@/lib/training/logic";
 
 function getStreak(sessions: typeof demoSessions): number {
-  const completed = sessions
-    .filter((s) => s.status === "completed")
-    .map((s) => s.date)
-    .sort()
-    .reverse();
-  return completed.length;
+  return sessions.filter((s) => s.status === "completed").length;
 }
 
 export default function HomePage() {
@@ -24,29 +20,19 @@ export default function HomePage() {
   const streak = getStreak(demoSessions);
 
   const dateLabel = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const mainLiftName = exercises.find((e) => e.id === firstLift.exerciseId)?.name ?? firstLift.exerciseId;
 
   return (
     <main className="safe-bottom mx-auto min-h-screen w-full max-w-md bg-surface px-4 pb-28 pt-6 text-ink">
-      {/* Top bar */}
+      {/* Minimal header */}
       <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-full bg-[#2563eb] text-sm font-bold text-white">
-            W
-          </div>
-          <div>
-            <p className="text-xs text-label">Good morning</p>
-            <p className="text-sm font-semibold text-ink">William</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {streak > 0 && (
-            <span className="flex items-center gap-1 rounded-full bg-[#fff3e0] px-3 py-1 text-xs font-bold text-[#e65100]">
-              <Flame className="size-3" aria-hidden />
-              {streak} sessions
-            </span>
-          )}
-          <p className="mono-copy text-xs text-label">{dateLabel}</p>
-        </div>
+        <p className="mono-copy text-sm text-label">{dateLabel}</p>
+        {streak > 0 && (
+          <span className="flex items-center gap-1 rounded-full bg-[#fff3e0] px-2.5 py-1 text-xs font-bold text-[#e65100]">
+            <Flame className="size-3" aria-hidden />
+            {streak}
+          </span>
+        )}
       </header>
 
       {/* Today's workout — primary blue card */}
@@ -76,7 +62,19 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Bento row — real charts */}
+      {/* Main lift progression chart */}
+      <section className="mb-4">
+        <div className="rounded-3xl border border-black/6 bg-white p-5 shadow-card">
+          <p className="text-xs font-semibold uppercase tracking-widest text-label">Main Lift</p>
+          <h2 className="chunky-title mt-1 text-2xl font-black leading-none text-ink">{mainLiftName}</h2>
+          <p className="mono-copy mt-0.5 text-xs text-label">Volume over recent sessions</p>
+          <div className="mt-3">
+            <LiftProgressChart sessions={demoSessions} exerciseId={firstLift.exerciseId} />
+          </div>
+        </div>
+      </section>
+
+      {/* Bento row — weekly stats */}
       <section className="mb-6 grid grid-cols-2 gap-3">
         <WeeklySetsChart
           dailySetCounts={weeklySummary.dailySetCounts}
