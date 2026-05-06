@@ -5,24 +5,34 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#f8f3e7",
+        // Light theme foundation
+        surface: "#f5f5f7",
+        "card-blue": "#2563eb",
+        "card-dark": "#111111",
+        "card-soft": "#e8eeff",
+        label: "#888888",
+        // Updated semantic colors
+        ink: "#111111",
+        fog: "#888888",
+        line: "rgba(0, 0, 0, 0.08)",
+        // Accents (kept for workout mode + charts)
+        moss: "#16a34a",
+        violet: "#7c3aed",
+        lavender: "#7c3aed",
+        sand: "#d97706",
+        // Legacy (kept for workout logger dark mode)
+        night: "#050507",
         paper: "#08080b",
-        line: "rgba(248, 243, 231, 0.12)",
         steel: "#9b98aa",
-        moss: "#82f0aa",
         ember: "#f0c98d",
         aqua: "#a98bff",
-        night: "#050507",
         carbon: "#111118",
-        graphite: "#191823",
-        violet: "#8f6cff",
-        lavender: "#d7c7ff",
-        sand: "#f0c98d",
-        fog: "#c7c2d8"
+        graphite: "#191823"
       },
       boxShadow: {
-        soft: "0 20px 60px rgba(0, 0, 0, 0.4)",
-        glow: "0 0 34px rgba(143, 108, 255, 0.28)"
+        soft: "0 4px 24px rgba(0, 0, 0, 0.08)",
+        glow: "0 0 34px rgba(124, 58, 237, 0.2)",
+        card: "0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04)"
       },
       keyframes: {
         "rise-in": {

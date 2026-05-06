@@ -15,7 +15,7 @@ function useMounted() {
 }
 
 function ChartPlaceholder({ height }: { height: string }) {
-  return <div className={`${height} w-full rounded-2xl border border-line bg-white/5`} />;
+  return <div className={`${height} w-full rounded-2xl border border-black/6 bg-surface`} />;
 }
 
 export function LiftProgressChart({ sessions, exerciseId }: { sessions: WorkoutSession[]; exerciseId: string }) {
@@ -34,18 +34,19 @@ export function LiftProgressChart({ sessions, exerciseId }: { sessions: WorkoutS
     <div className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={220}>
         <LineChart data={data} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-          <CartesianGrid stroke="rgba(248,243,231,0.09)" strokeDasharray="3 3" />
-          <XAxis dataKey="date" tickLine={false} axisLine={false} stroke="#9b98aa" fontSize={12} />
-          <YAxis tickLine={false} axisLine={false} stroke="#9b98aa" fontSize={12} />
+          <CartesianGrid stroke="rgba(0,0,0,0.06)" strokeDasharray="3 3" />
+          <XAxis dataKey="date" tickLine={false} axisLine={false} stroke="#888" fontSize={12} />
+          <YAxis tickLine={false} axisLine={false} stroke="#888" fontSize={12} />
           <Tooltip
             contentStyle={{
-              background: "#111118",
-              border: "1px solid rgba(248,243,231,0.12)",
-              borderRadius: 16,
-              color: "#f8f3e7"
+              background: "#ffffff",
+              border: "1px solid rgba(0,0,0,0.08)",
+              borderRadius: 12,
+              color: "#111111",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.08)"
             }}
           />
-          <Line type="monotone" dataKey="volume" stroke="#f0c98d" strokeWidth={3} dot={{ r: 4, fill: "#8f6cff" }} />
+          <Line type="monotone" dataKey="volume" stroke="#7c3aed" strokeWidth={3} dot={{ r: 4, fill: "#2563eb" }} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -67,18 +68,19 @@ export function MuscleVolumeChart({ volume, muscles }: { volume: MuscleVolume[];
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={256}>
         <BarChart data={data} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-          <CartesianGrid stroke="rgba(248,243,231,0.09)" strokeDasharray="3 3" />
-          <XAxis dataKey="muscle" tickLine={false} axisLine={false} interval={0} fontSize={11} stroke="#9b98aa" />
-          <YAxis tickLine={false} axisLine={false} stroke="#9b98aa" fontSize={12} />
+          <CartesianGrid stroke="rgba(0,0,0,0.06)" strokeDasharray="3 3" />
+          <XAxis dataKey="muscle" tickLine={false} axisLine={false} interval={0} fontSize={11} stroke="#888" />
+          <YAxis tickLine={false} axisLine={false} stroke="#888" fontSize={12} />
           <Tooltip
             contentStyle={{
-              background: "#111118",
-              border: "1px solid rgba(248,243,231,0.12)",
-              borderRadius: 16,
-              color: "#f8f3e7"
+              background: "#ffffff",
+              border: "1px solid rgba(0,0,0,0.08)",
+              borderRadius: 12,
+              color: "#111111",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.08)"
             }}
           />
-          <Bar dataKey="sets" fill="#8f6cff" radius={[8, 8, 0, 0]} />
+          <Bar dataKey="sets" fill="#2563eb" radius={[8, 8, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

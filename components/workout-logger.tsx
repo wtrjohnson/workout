@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, Repeat2 } from "lucide-react";
+import { Clock, Info, Repeat2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
 import { demoSessions } from "@/lib/training/data";
@@ -135,14 +135,10 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
 
       <section className="py-3">
         <h2 className="chunky-title text-5xl font-black leading-none text-white">{shortExerciseName(currentExercise.name)}</h2>
-        <p className="mono-copy mt-4 text-lg leading-7 text-white/86">
-          {currentExercise.techniqueCues[0] ?? suggested.reason}
+        <p className="mono-copy mt-3 text-sm text-white/60">
+          Set {activeStep.setIndex + 1} of {activeStep.planned.targetSets}
         </p>
       </section>
-
-      <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#2a003d]">
-        <div className="h-full rounded-md bg-[#5a007a]" style={{ width: `${Math.max(10, progress)}%` }} />
-      </div>
 
       <section className="rounded-[2.5rem] bg-[#52006f] px-5 py-7">
         <div className="grid grid-cols-2 gap-4">
@@ -167,12 +163,12 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
           Log set
         </button>
         <button
-          className="grid size-16 place-items-center rounded-full bg-[#082866] text-4xl font-black leading-none text-white"
+          className="grid size-16 place-items-center rounded-full bg-[#082866] text-white"
           onClick={() => setActivePanel("history")}
           type="button"
           aria-label="Exercise history"
         >
-          ?
+          <Clock className="size-7" aria-hidden />
         </button>
         <button
           className="grid size-16 place-items-center rounded-full bg-[#4a4a4a] text-white"

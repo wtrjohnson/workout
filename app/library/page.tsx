@@ -4,37 +4,31 @@ import { exercises } from "@/lib/training/data";
 
 export default function LibraryPage() {
   return (
-    <AppShell eyebrow="Exercise library" title="Planet Fitness-ready lifts">
-      <label className="glass-panel flex items-center gap-2 rounded-full px-4 py-2">
-        <Search className="size-4 text-sand" />
-        <input className="w-full bg-transparent py-2 text-sm text-ink outline-none placeholder:text-fog/48" placeholder="Search by lift, muscle, equipment" />
+    <AppShell eyebrow="Exercise library" title="Planet Fitness lifts">
+      <label className="flex items-center gap-2 rounded-full border border-black/8 bg-white px-4 py-3 shadow-card">
+        <Search className="size-4 text-label" />
+        <input className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-label/60" placeholder="Search by lift, muscle, equipment" />
       </label>
 
-      <section className="space-y-3">
+      <section className="space-y-2">
         {exercises.map((exercise) => (
-          <article key={exercise.id} className="glass-panel card-hover animate-rise-in rounded-[1.5rem] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold leading-tight text-ink">{exercise.name}</h2>
-                <p className="mt-1 text-sm capitalize text-fog/65">{exercise.movementPattern.replaceAll("_", " ")}</p>
+          <article key={exercise.id} className="card-hover animate-rise-in rounded-2xl border border-black/6 bg-white p-4 shadow-card">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-bold text-ink">{exercise.name}</h2>
+                <p className="mt-0.5 text-xs capitalize text-label">{exercise.movementPattern.replaceAll("_", " ")}</p>
               </div>
-              <span className="rounded-full border border-sand/20 bg-sand/12 px-2 py-1 text-xs font-semibold text-sand">
+              <span className="shrink-0 rounded-full border border-[#2563eb]/20 bg-[#e8eeff] px-2 py-1 text-xs font-semibold text-[#2563eb]">
                 PF
               </span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {exercise.primaryMuscles.map((muscle) => (
-                <span key={muscle} className="rounded-full bg-violet/14 px-2 py-1 text-xs font-semibold text-lavender">
-                  {muscle.replaceAll("_", " ")}
-                </span>
-              ))}
-              {exercise.secondaryMuscles.slice(0, 3).map((muscle) => (
-                <span key={muscle} className="rounded-full bg-white/7 px-2 py-1 text-xs font-medium text-fog/70">
+                <span key={muscle} className="rounded-full bg-[#e8eeff] px-2 py-0.5 text-xs font-medium text-[#2563eb]">
                   {muscle.replaceAll("_", " ")}
                 </span>
               ))}
             </div>
-            <p className="mt-3 text-sm leading-6 text-fog/72">{exercise.techniqueCues.join(" ")}</p>
           </article>
         ))}
       </section>

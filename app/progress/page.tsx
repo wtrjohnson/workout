@@ -5,6 +5,14 @@ import { LiftProgressChart, MuscleVolumeChart } from "@/components/progress-char
 import { demoSessions, muscles } from "@/lib/training/data";
 import { calculateRecovery, calculateWeeklyMuscleVolume } from "@/lib/training/logic";
 
+const statusColors: Record<string, { bg: string; text: string }> = {
+  fresh: { bg: "bg-[#e8fdf0]", text: "text-[#16a34a]" },
+  ready: { bg: "bg-[#e8eeff]", text: "text-[#2563eb]" },
+  fatigued: { bg: "bg-[#fef3e2]", text: "text-[#d97706]" },
+  recovering: { bg: "bg-[#fef3e2]", text: "text-[#d97706]" },
+  overreached: { bg: "bg-[#fee2e2]", text: "text-[#dc2626]" }
+};
+
 export default function ProgressPage() {
   const today = new Date("2026-05-05T12:00:00");
   const volume = calculateWeeklyMuscleVolume(demoSessions, today);
@@ -14,7 +22,7 @@ export default function ProgressPage() {
   const consistency = Math.min(100, Math.round((demoSessions.filter((session) => session.status === "completed").length / 3) * 100));
 
   return (
-    <AppShell eyebrow="Analytics" title="Progress dashboard">
+    <AppShell eyebrow="Analytics" title="Progress">
       <section className="grid grid-cols-3 gap-2">
         <MetricRing label="Load" value={volumeTarget} detail="volume" accent="violet" size="sm" />
         <MetricRing label="Ready" value={readiness} detail="recovery" accent="moss" size="sm" />
@@ -29,18 +37,19 @@ export default function ProgressPage() {
         <MuscleVolumeChart volume={volume} muscles={muscles} />
       </DarkChartCard>
 
-      <section className="glass-panel rounded-[1.5rem] p-4">
-        <h2 className="text-base font-semibold text-ink">Recovery status</h2>
-        <div className="mt-3 space-y-2">
+      <section>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-label">Recovery Status</p>
+        <div className="space-y-2">
           {recovery
             .filter((item) => item.lastTrainedDaysAgo !== null)
             .slice(0, 8)
             .map((item) => {
               const muscle = muscles.find((entry) => entry.id === item.muscleId);
+              const colors = statusColors[item.status] ?? { bg: "bg-[#e8eeff]", text: "text-[#2563eb]" };
               return (
-                <div key={item.muscleId} className="flex items-center justify-between rounded-2xl border border-line bg-white/5 px-3 py-3">
+                <div key={item.muscleId} className="flex items-center justify-between rounded-2xl border border-black/6 bg-white px-4 py-3 shadow-card">
                   <span className="text-sm font-medium text-ink">{muscle?.name}</span>
-                  <span className="rounded-full bg-violet/12 px-2 py-1 text-xs font-semibold capitalize text-lavender">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${colors.bg} ${colors.text}`}>
                     {item.status.replace("_", " ")}
                   </span>
                 </div>
