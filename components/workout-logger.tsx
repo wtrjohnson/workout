@@ -133,14 +133,14 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
         progress={progress}
       />
 
-      <section className="py-3">
-        <h2 className="chunky-title text-5xl font-black leading-none text-white">{shortExerciseName(currentExercise.name)}</h2>
-        <p className="mono-copy mt-3 text-sm text-white/60">
+      <section className="py-2">
+        <h2 className="chunky-title text-5xl font-black leading-none text-ink">{shortExerciseName(currentExercise.name)}</h2>
+        <p className="mono-copy mt-3 text-sm text-label">
           Set {activeStep.setIndex + 1} of {activeStep.planned.targetSets}
         </p>
       </section>
 
-      <section className="rounded-[2.5rem] bg-[#52006f] px-5 py-7">
+      <section className="rounded-3xl bg-[#2563eb] px-5 py-7">
         <div className="grid grid-cols-2 gap-4">
           <StepperValue
             label="Weight"
@@ -156,27 +156,27 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
 
       <div className="flex items-center gap-3">
         <button
-          className="tap-target flex-1 rounded-3xl bg-[#008415] px-5 py-4 text-3xl font-black leading-none text-white"
+          className="tap-target flex-1 rounded-3xl bg-ink px-5 py-4 text-3xl font-black leading-none text-white shadow-card"
           onClick={completeSet}
           type="button"
         >
           Log set
         </button>
         <button
-          className="grid size-16 place-items-center rounded-full bg-[#082866] text-white"
+          className="grid size-16 place-items-center rounded-full border border-black/8 bg-white text-ink shadow-card"
           onClick={() => setActivePanel("history")}
           type="button"
           aria-label="Exercise history"
         >
-          <Clock className="size-7" aria-hidden />
+          <Clock className="size-6" aria-hidden />
         </button>
         <button
-          className="grid size-16 place-items-center rounded-full bg-[#4a4a4a] text-white"
+          className="grid size-16 place-items-center rounded-full border border-black/8 bg-white text-ink shadow-card"
           onClick={() => setActivePanel("info")}
           type="button"
           aria-label="Exercise information"
         >
-          <Info className="size-7" aria-hidden />
+          <Info className="size-6" aria-hidden />
         </button>
       </div>
 
@@ -213,17 +213,13 @@ function ProgressStrip({
   progress: number;
 }) {
   return (
-    <section className="rounded-2xl p-1">
-      <div className="flex items-center justify-between text-xs font-semibold text-white/50">
-        <span>
-          {completedSets} / {totalSets} sets
-        </span>
-        <span>
-          Exercise {exerciseIndex} / {totalExercises}
-        </span>
+    <section className="rounded-2xl">
+      <div className="flex items-center justify-between text-xs font-semibold text-label">
+        <span>{completedSets} / {totalSets} sets</span>
+        <span>Exercise {exerciseIndex} / {totalExercises}</span>
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full bg-[#5a007a] transition-all" style={{ width: `${progress}%` }} />
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/8">
+        <div className="h-full rounded-full bg-[#2563eb] transition-all" style={{ width: `${progress}%` }} />
       </div>
     </section>
   );
@@ -252,7 +248,7 @@ function StepperValue({
 
   return (
     <div className="text-center">
-      <button className="mx-auto grid size-10 place-items-center text-[#8d45ad]" onClick={() => adjust(step)} type="button" aria-label={`Increase ${label}`}>
+      <button className="mx-auto grid size-10 place-items-center text-white/60" onClick={() => adjust(step)} type="button" aria-label={`Increase ${label}`}>
         <Triangle direction="up" />
       </button>
       <div className="flex items-baseline justify-center">
@@ -265,9 +261,9 @@ function StepperValue({
             value={value ?? ""}
           />
         </label>
-        <span className="chunky-title -ml-1 text-5xl font-black leading-none text-[#8d45ad]">{unit}</span>
+        <span className="chunky-title -ml-1 text-5xl font-black leading-none text-white/60">{unit}</span>
       </div>
-      <button className="mx-auto grid size-10 place-items-center text-[#8d45ad]" onClick={() => adjust(-step)} type="button" aria-label={`Decrease ${label}`}>
+      <button className="mx-auto grid size-10 place-items-center text-white/60" onClick={() => adjust(-step)} type="button" aria-label={`Decrease ${label}`}>
         <Triangle direction="down" />
       </button>
     </div>
@@ -303,39 +299,39 @@ function RestScreen({
 
   return (
     <section className="flex min-h-[72vh] flex-1 flex-col px-1 py-3">
-      <h2 className="chunky-title text-5xl font-black leading-none text-white">Rest</h2>
+      <h2 className="chunky-title text-5xl font-black leading-none text-ink">Rest</h2>
       <div className="relative mx-auto mt-12 grid size-64 place-items-center rounded-full">
         <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden>
-          <circle cx="50" cy="50" r="43" fill="none" stroke="rgba(255,255,255,0.02)" strokeWidth="8" />
+          <circle cx="50" cy="50" r="43" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="8" />
           <circle
             cx="50"
             cy="50"
             r="43"
             fill="none"
-            stroke="#5a007a"
+            stroke="#2563eb"
             strokeDasharray="270"
             strokeDashoffset={270 - 270 * (progress / 100)}
             strokeLinecap="round"
             strokeWidth="8"
           />
         </svg>
-        <p className="mono-copy text-5xl leading-none text-white">{formatSeconds(remainingRest)}</p>
+        <p className="mono-copy text-5xl leading-none text-ink">{formatSeconds(remainingRest)}</p>
       </div>
       <div className="mt-10 flex justify-center gap-4">
-        <button className="tap-target rounded-3xl bg-[#082866] px-5 py-3 text-2xl font-black leading-none text-white" onClick={onAddTime} type="button">
+        <button className="tap-target rounded-3xl border border-black/8 bg-white px-5 py-3 text-xl font-black leading-none text-ink shadow-card" onClick={onAddTime} type="button">
           +30 sec
         </button>
-        <button className="tap-target rounded-3xl bg-[#4a4a4a] px-5 py-3 text-2xl font-black leading-none text-white" onClick={onSkip} type="button">
+        <button className="tap-target rounded-3xl bg-ink px-5 py-3 text-xl font-black leading-none text-white shadow-card" onClick={onSkip} type="button">
           skip rest
         </button>
       </div>
       <div className="mt-auto flex items-baseline gap-4 pb-2">
-        <p className="chunky-title text-5xl font-black leading-none text-white">Up next</p>
-        <p className="text-5xl font-light leading-none text-white">
+        <p className="chunky-title text-5xl font-black leading-none text-ink">Up next</p>
+        <p className="text-5xl font-light leading-none text-label">
           {nextSet ? `set ${nextSet}` : "done"}
         </p>
       </div>
-      <p className="mono-copy -mt-1 truncate text-sm text-white/45">{nextLabel}</p>
+      <p className="mono-copy -mt-1 truncate text-sm text-label">{nextLabel}</p>
     </section>
   );
 }
@@ -343,16 +339,16 @@ function RestScreen({
 function ExerciseStatsPanel({ stats, suggestion }: { stats: ReturnType<typeof getExerciseStats>; suggestion: string }) {
   return (
     <div>
-      <p className="text-sm font-black text-white">Exercise history</p>
-      <div className="mt-3 rounded-2xl bg-white/8 p-3">
-        <p className="mono-copy text-xs text-white/52">Suggestion</p>
-        <p className="mono-copy mt-1 text-sm leading-6 text-white/78">{suggestion}</p>
+      <p className="text-sm font-bold text-ink">Exercise history</p>
+      <div className="mt-3 rounded-2xl border border-black/6 bg-surface p-3">
+        <p className="mono-copy text-xs text-label">Suggestion</p>
+        <p className="mono-copy mt-1 text-sm leading-6 text-ink">{suggestion}</p>
       </div>
       {stats.lastSets.length > 0 ? (
         <>
-          <div className="mt-3 rounded-2xl bg-white/8 p-3">
-            <p className="mono-copy text-xs text-white/52">Last time</p>
-            <p className="mono-copy mt-1 text-sm leading-6 text-white">
+          <div className="mt-3 rounded-2xl border border-black/6 bg-surface p-3">
+            <p className="mono-copy text-xs text-label">Last time</p>
+            <p className="mono-copy mt-1 text-sm leading-6 text-ink">
               {stats.lastSets.map((set) => `${set.weight} x ${set.reps}`).join(", ")}
             </p>
           </div>
@@ -367,12 +363,12 @@ function ExerciseStatsPanel({ stats, suggestion }: { stats: ReturnType<typeof ge
               }
             />
           </div>
-          <p className="mono-copy mt-3 text-xs leading-5 text-white/60">
+          <p className="mono-copy mt-3 text-xs leading-5 text-label">
             Logged {stats.totalSets} sets across {stats.sessionsLogged} sessions.
           </p>
         </>
       ) : (
-        <p className="mono-copy mt-2 text-sm leading-6 text-white/70">No prior stats yet. This set starts the history.</p>
+        <p className="mono-copy mt-2 text-sm leading-6 text-label">No prior stats yet. This set starts the history.</p>
       )}
     </div>
   );
@@ -393,14 +389,14 @@ function ExerciseInfoPanel({
 }) {
   return (
     <div>
-      <p className="text-sm font-black text-white">Cues</p>
-      <p className="mono-copy mt-1 text-sm leading-6 text-white/72">{cues.join(" ")}</p>
-      <p className="mt-4 text-sm font-black text-white">Swaps</p>
+      <p className="text-sm font-bold text-ink">Cues</p>
+      <p className="mono-copy mt-1 text-sm leading-6 text-label">{cues.join(" ")}</p>
+      <p className="mt-4 text-sm font-bold text-ink">Swaps</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {substitutions.map((substitution) => (
           <button
             key={substitution.id}
-            className="tap-target card-hover rounded-full border border-[#ba00ff]/25 bg-[#5a007a]/35 px-3 py-2 text-xs font-semibold text-white"
+            className="tap-target card-hover rounded-full border border-[#2563eb]/20 bg-[#e8eeff] px-3 py-2 text-xs font-semibold text-[#2563eb]"
             onClick={() => onSwap(substitution.id)}
             type="button"
           >
@@ -409,7 +405,7 @@ function ExerciseInfoPanel({
           </button>
         ))}
       </div>
-      <p className="mt-4 text-sm font-black text-white">Pain flags</p>
+      <p className="mt-4 text-sm font-bold text-ink">Pain flags</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {painOptions.map((flag) => (
           <SelectableChip key={flag} active={painFlags.includes(flag)} onClick={() => onPainToggle(flag)}>
@@ -431,11 +427,11 @@ function PanelOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-black/62 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
-      <section className="w-full max-w-md rounded-[2rem] bg-[#171717] p-4 shadow-soft">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="chunky-title text-3xl font-black leading-none text-white">{title}</h2>
-          <button className="rounded-full bg-white/10 px-4 py-2 text-sm font-black text-white" onClick={onClose} type="button">
+    <div className="fixed inset-0 z-50 grid place-items-end bg-black/30 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
+      <section className="w-full max-w-md rounded-3xl border border-black/6 bg-white p-5 shadow-soft">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="chunky-title text-3xl font-black leading-none text-ink">{title}</h2>
+          <button className="rounded-full border border-black/8 bg-surface px-4 py-2 text-sm font-bold text-ink" onClick={onClose} type="button">
             Close
           </button>
         </div>
@@ -447,9 +443,9 @@ function PanelOverlay({
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white/8 p-3">
-      <p className="mono-copy text-xs text-white/52">{label}</p>
-      <p className="mt-1 text-xl font-black leading-none text-white">{value}</p>
+    <div className="rounded-2xl border border-black/6 bg-surface p-3">
+      <p className="mono-copy text-xs text-label">{label}</p>
+      <p className="mt-1 text-xl font-black leading-none text-ink">{value}</p>
     </div>
   );
 }
@@ -458,14 +454,14 @@ function WorkoutScorecard({ loggedSets, totalSets }: { loggedSets: LoggedSet[]; 
   const totalVolume = loggedSets.reduce((sum, set) => sum + (set.weight ?? 0) * set.reps, 0);
 
   return (
-    <section className="rounded-[1.7rem] border border-sand/30 bg-gradient-to-br from-sand/20 to-violet/18 p-5 text-ink shadow-glow">
-      <p className="text-sm font-semibold text-sand">Workout complete</p>
-      <h2 className="mt-3 text-5xl font-semibold leading-none">Scorecard</h2>
+    <section className="rounded-3xl border border-[#2563eb]/20 bg-[#e8eeff] p-5 shadow-card">
+      <p className="text-sm font-semibold text-[#2563eb]">Workout complete</p>
+      <h2 className="chunky-title mt-3 text-5xl font-black leading-none text-ink">Scorecard</h2>
       <div className="mt-6 grid grid-cols-2 gap-3">
         <ScoreMetric label="Sets logged" value={`${loggedSets.length}/${totalSets}`} />
         <ScoreMetric label="Volume" value={`${Math.round(totalVolume).toLocaleString()} lb`} />
       </div>
-      <p className="mt-5 text-sm leading-6 text-fog/76">
+      <p className="mt-5 text-sm leading-6 text-label">
         Prototype logging is complete for this session. The next persistence pass can save these exact completed sets to Neon.
       </p>
     </section>
@@ -474,9 +470,9 @@ function WorkoutScorecard({ loggedSets, totalSets }: { loggedSets: LoggedSet[]; 
 
 function ScoreMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-night/35 p-3">
+    <div className="rounded-2xl border border-black/6 bg-white p-3 shadow-card">
       <p className="text-2xl font-semibold text-ink">{value}</p>
-      <p className="mt-1 text-xs font-semibold text-fog/55">{label}</p>
+      <p className="mt-1 text-xs font-semibold text-label">{label}</p>
     </div>
   );
 }

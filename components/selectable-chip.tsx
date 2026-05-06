@@ -13,10 +13,10 @@ export function SelectableChip({
 }) {
   return (
     <button
-      className={`tap-target card-hover rounded-full border px-3 py-2 text-xs font-semibold ${
+      className={`tap-target card-hover rounded-full border px-3 py-2 text-xs font-semibold transition ${
         active
-          ? "border-sand/70 bg-sand text-night shadow-glow"
-          : "border-line bg-white/5 text-fog hover:border-sand/40 hover:text-ink"
+          ? "border-[#2563eb]/30 bg-[#2563eb] text-white"
+          : "border-black/8 bg-surface text-ink hover:border-[#2563eb]/20 hover:bg-[#e8eeff]"
       } ${className}`}
       onClick={onClick}
       type="button"
