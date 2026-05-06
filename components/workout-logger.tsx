@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Info, Repeat2 } from "lucide-react";
+import { Clock, Repeat2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
 import { demoSessions } from "@/lib/training/data";
@@ -134,9 +134,18 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
       />
 
       <section className="py-2">
-        <h2 className="chunky-title text-5xl font-black leading-none text-ink">{shortExerciseName(currentExercise.name)}</h2>
+        <button
+          className="text-left"
+          onClick={() => setActivePanel("info")}
+          type="button"
+          aria-label="View form cues"
+        >
+          <h2 className="chunky-title text-5xl font-black leading-none text-ink underline decoration-[#2563eb] decoration-2 underline-offset-4">
+            {shortExerciseName(currentExercise.name)}
+          </h2>
+        </button>
         <p className="mono-copy mt-3 text-sm text-label">
-          Set {activeStep.setIndex + 1} of {activeStep.planned.targetSets}
+          Set {activeStep.setIndex + 1} of {activeStep.planned.targetSets} · tap name for form cues
         </p>
       </section>
 
@@ -169,14 +178,6 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
           aria-label="Exercise history"
         >
           <Clock className="size-6" aria-hidden />
-        </button>
-        <button
-          className="grid size-16 place-items-center rounded-full border border-black/8 bg-white text-ink shadow-card"
-          onClick={() => setActivePanel("info")}
-          type="button"
-          aria-label="Exercise information"
-        >
-          <Info className="size-6" aria-hidden />
         </button>
       </div>
 

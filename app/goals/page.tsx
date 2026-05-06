@@ -1,4 +1,5 @@
-import { Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 
 const priorities = ["Muscle gain", "Strength", "Fat loss", "Consistency", "General health"];
@@ -70,6 +71,17 @@ export default function GoalsPage() {
       <button className="tap-target w-full rounded-full bg-[#2563eb] px-4 py-4 font-bold text-white shadow-card transition active:scale-[0.98]">
         Save setup
       </button>
+
+      <Link
+        href="/library"
+        className="flex items-center justify-between rounded-2xl border border-black/6 bg-white px-4 py-4 shadow-card"
+      >
+        <div>
+          <p className="text-sm font-bold text-ink">Exercise library</p>
+          <p className="mt-0.5 text-xs text-label">Browse all Planet Fitness-ready lifts</p>
+        </div>
+        <ArrowRight className="size-4 text-label" aria-hidden />
+      </Link>
     </AppShell>
   );
 }

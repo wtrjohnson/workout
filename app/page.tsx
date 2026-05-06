@@ -1,8 +1,18 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Flame } from "lucide-react";
 import Link from "next/link";
 import { BottomNav } from "@/components/bottom-nav";
+import { WeeklySetsChart, LoadTrendChart } from "@/components/home-charts";
 import { demoSessions } from "@/lib/training/data";
 import { generateInsights, getTodayWorkout, getWeeklySummary, suggestProgression } from "@/lib/training/logic";
+
+function getStreak(sessions: typeof demoSessions): number {
+  const completed = sessions
+    .filter((s) => s.status === "completed")
+    .map((s) => s.date)
+    .sort()
+    .reverse();
+  return completed.length;
+}
 
 export default function HomePage() {
   const today = new Date("2026-05-05T12:00:00");
@@ -11,6 +21,7 @@ export default function HomePage() {
   const totalSets = workout.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0);
   const firstLift = workout.exercises[0];
   const weeklySummary = getWeeklySummary(demoSessions, today);
+  const streak = getStreak(demoSessions);
 
   const dateLabel = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
@@ -27,7 +38,15 @@ export default function HomePage() {
             <p className="text-sm font-semibold text-ink">William</p>
           </div>
         </div>
-        <p className="mono-copy text-xs text-label">{dateLabel}</p>
+        <div className="flex items-center gap-2">
+          {streak > 0 && (
+            <span className="flex items-center gap-1 rounded-full bg-[#fff3e0] px-3 py-1 text-xs font-bold text-[#e65100]">
+              <Flame className="size-3" aria-hidden />
+              {streak} sessions
+            </span>
+          )}
+          <p className="mono-copy text-xs text-label">{dateLabel}</p>
+        </div>
       </header>
 
       {/* Today's workout — primary blue card */}
@@ -57,10 +76,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Bento row — dark + soft blue */}
+      {/* Bento row — real charts */}
       <section className="mb-6 grid grid-cols-2 gap-3">
-        <WeeklySetsCard summary={weeklySummary} plannedSets={totalSets} />
-        <LoadCard changePercent={weeklySummary.volumeChangePercent} totalVolume={weeklySummary.totalVolume} />
+        <WeeklySetsChart
+          dailySetCounts={weeklySummary.dailySetCounts}
+          completedSets={weeklySummary.completedSets}
+          plannedSets={totalSets}
+        />
+        <LoadTrendChart sessions={demoSessions} />
       </section>
 
       {/* Coach feed */}
@@ -78,44 +101,5 @@ export default function HomePage() {
 
       <BottomNav />
     </main>
-  );
-}
-
-function WeeklySetsCard({ summary, plannedSets }: { summary: ReturnType<typeof getWeeklySummary>; plannedSets: number }) {
-  const maxSets = Math.max(plannedSets, ...summary.dailySetCounts, 1);
-
-  return (
-    <article className="rounded-3xl bg-[#111111] p-4 text-white">
-      <p className="mono-copy text-xs text-white/55">This week</p>
-      <div className="mt-3 flex h-16 items-end gap-1.5">
-        {summary.dailySetCounts.map((sets, index) => (
-          <div
-            key={index}
-            className={`flex-1 rounded-full ${sets > 0 ? "bg-white/80" : "bg-white/20"}`}
-            style={{ height: `${Math.max(12, (sets / maxSets) * 100)}%` }}
-          />
-        ))}
-      </div>
-      <p className="mono-copy mt-3 text-lg font-black leading-none">{summary.completedSets}</p>
-      <p className="mono-copy text-xs text-white/55">of {plannedSets} sets</p>
-    </article>
-  );
-}
-
-function LoadCard({ changePercent, totalVolume }: { changePercent: number | null; totalVolume: number }) {
-  const positive = (changePercent ?? 0) >= 0;
-
-  return (
-    <article className="rounded-3xl bg-[#e8eeff] p-4 text-[#111111]">
-      <p className="mono-copy text-xs text-[#555]">Load trend</p>
-      <svg className="mt-3 h-16 w-full" viewBox="0 0 160 105" aria-hidden>
-        <path d="M5 76 L38 46 L60 46 L78 12 L98 12 L121 50 L139 50 L156 18" fill="none" stroke="#2563eb" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M5 34 L34 34 L61 22 L82 43 L99 58 L122 58 L145 50 L158 66" fill="none" stroke="#2563eb" strokeWidth="3" strokeOpacity="0.3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <p className="mono-copy mt-2 text-lg font-black leading-none text-[#111]">
-        {changePercent === null ? `${Math.round(totalVolume).toLocaleString()} lb` : `${positive ? "+" : ""}${changePercent}%`}
-      </p>
-      <p className="mono-copy text-xs text-[#555]">volume</p>
-    </article>
   );
 }

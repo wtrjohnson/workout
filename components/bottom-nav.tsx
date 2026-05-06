@@ -1,14 +1,12 @@
 "use client";
 
-import { BarChart3, BookOpen, Dumbbell, Home, SlidersHorizontal } from "lucide-react";
+import { BarChart3, Home, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
 
 const items: Array<{ href: Route; label: string; icon: typeof Home }> = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/workout", label: "Workout", icon: Dumbbell },
-  { href: "/library", label: "Library", icon: BookOpen },
   { href: "/progress", label: "Progress", icon: BarChart3 },
   { href: "/goals", label: "Goals", icon: SlidersHorizontal }
 ];
