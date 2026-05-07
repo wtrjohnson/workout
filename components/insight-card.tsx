@@ -1,11 +1,14 @@
-import { Brain, ChartNoAxesCombined, Flame, RotateCcw } from "lucide-react";
+import { Brain, ChartNoAxesCombined, Flame, RotateCcw, TrendingDown, TrendingUp } from "lucide-react";
 import type { Insight } from "@/lib/training/types";
 
-const iconMap = {
+const iconMap: Record<Insight["type"], React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
   progress: ChartNoAxesCombined,
   balance: Brain,
   recovery: RotateCcw,
-  consistency: Flame
+  consistency: Flame,
+  plateau: TrendingDown,
+  streak: TrendingUp,
+  deload: RotateCcw
 };
 
 export function InsightCard({ insight }: { insight: Insight }) {

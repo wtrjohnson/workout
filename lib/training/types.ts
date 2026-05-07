@@ -94,6 +94,8 @@ export type PerformedSet = {
   date: string;
 };
 
+export type PerceivedEffort = "easy" | "moderate" | "hard" | "very_hard";
+
 export type WorkoutSession = {
   id: string;
   templateId: string;
@@ -102,6 +104,7 @@ export type WorkoutSession = {
   performedSets: PerformedSet[];
   swappedExerciseIds?: Record<string, string>;
   notes?: string;
+  perceivedEffort?: PerceivedEffort;
 };
 
 export type VolumeStatus = "under_target" | "on_track" | "high" | "overreaching";
@@ -123,7 +126,7 @@ export type MuscleRecovery = {
 
 export type Insight = {
   id: string;
-  type: "progress" | "balance" | "recovery" | "consistency";
+  type: "progress" | "balance" | "recovery" | "consistency" | "plateau" | "streak" | "deload";
   tone: "data" | "encouraging" | "tough_love";
   title: string;
   message: string;

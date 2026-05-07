@@ -11,9 +11,11 @@ import {
   getExerciseStats,
   getExercise,
   getRestSeconds,
-  getSuggestedSet
+  getSetFeedback,
+  getSuggestedSet,
+  scoreSession
 } from "@/lib/training/logic";
-import type { WorkoutTemplate } from "@/lib/training/types";
+import type { PerceivedEffort, WorkoutTemplate } from "@/lib/training/types";
 
 type LoggedSet = {
   exerciseId: string;
@@ -35,6 +37,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
   const [swaps, setSwaps] = useState<Record<string, string>>({});
   const [loggedSets, setLoggedSets] = useState<LoggedSet[]>([]);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [setFeedback, setSetFeedback] = useState<import("@/lib/training/logic").SetFeedback | null>(null);
 
   const activeStep = steps[activeStepIndex];
   const currentExerciseId = swaps[activeStep.planned.exerciseId] ?? activeStep.planned.exerciseId;
@@ -77,6 +80,15 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
       reps
     };
 
+    const sessionExerciseSets = loggedSets
+      .filter((s) => s.exerciseId === currentExerciseId)
+      .map((s) => ({ reps: s.reps, weight: s.weight ?? 0 }));
+    const priorSets = demoSessions
+      .flatMap((s) => s.performedSets)
+      .filter((s) => s.exerciseId === currentExerciseId);
+    const feedback = getSetFeedback(reps, currentPlanned, sessionExerciseSets, priorSets);
+    setSetFeedback(feedback);
+
     setLoggedSets((current) => [...current, completedSet]);
 
     if (activeStepIndex >= steps.length - 1) {
@@ -84,7 +96,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
       return;
     }
 
-    setRemainingRest(restSeconds);
+    setRemainingRest(getRestSeconds(currentPlanned, reps));
     setMode("resting");
   }
 
@@ -108,7 +120,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
   }
 
   if (mode === "complete") {
-    return <WorkoutScorecard loggedSets={loggedSets} totalSets={steps.length} />;
+    return <WorkoutScorecard loggedSets={loggedSets} totalSets={steps.length} workout={workout} />;
   }
 
   if (mode === "resting") {
@@ -118,6 +130,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
         restSeconds={restSeconds}
         nextLabel={nextStep ? getExercise(swaps[nextStep.planned.exerciseId] ?? nextStep.planned.exerciseId).name : "Scorecard"}
         nextSet={nextStep ? nextStep.setIndex + 1 : null}
+        feedback={setFeedback}
         onAddTime={() => setRemainingRest((current) => current + 30)}
         onRemoveTime={() => setRemainingRest((current) => Math.max(0, current - 30))}
         onSkip={goToNextStep}
@@ -288,6 +301,7 @@ function RestScreen({
   restSeconds,
   nextLabel,
   nextSet,
+  feedback,
   onAddTime,
   onRemoveTime,
   onSkip
@@ -296,11 +310,16 @@ function RestScreen({
   restSeconds: number;
   nextLabel: string;
   nextSet: number | null;
+  feedback: import("@/lib/training/logic").SetFeedback | null;
   onAddTime: () => void;
   onRemoveTime: () => void;
   onSkip: () => void;
 }) {
   const progress = Math.max(0, Math.min(100, Math.round((remainingRest / restSeconds) * 100)));
+  const feedbackColor =
+    feedback?.tone === "positive" ? "text-[#16a34a]" :
+    feedback?.tone === "caution" ? "text-[#d97706]" :
+    "text-label";
 
   return (
     <section className="flex min-h-[72vh] flex-1 flex-col px-1 py-3">
@@ -322,7 +341,10 @@ function RestScreen({
         </svg>
         <p className="mono-copy text-5xl leading-none text-ink">{formatSeconds(remainingRest)}</p>
       </div>
-      <div className="mt-10 flex justify-center gap-2">
+      {feedback && (
+        <p className={`mono-copy mt-4 text-center text-sm ${feedbackColor}`}>{feedback.message}</p>
+      )}
+      <div className="mt-6 flex justify-center gap-2">
         <button className="tap-target rounded-3xl border border-black/8 bg-white px-4 py-3 text-lg font-black leading-none text-ink shadow-card" onClick={onRemoveTime} type="button">
           −30
         </button>
@@ -458,20 +480,62 @@ function StatTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function WorkoutScorecard({ loggedSets, totalSets }: { loggedSets: LoggedSet[]; totalSets: number }) {
+const EFFORT_OPTIONS: Array<{ value: PerceivedEffort; label: string }> = [
+  { value: "easy", label: "Easy" },
+  { value: "moderate", label: "Just right" },
+  { value: "hard", label: "Hard" },
+  { value: "very_hard", label: "Wrecked" }
+];
+
+function WorkoutScorecard({
+  loggedSets,
+  totalSets,
+  workout
+}: {
+  loggedSets: LoggedSet[];
+  totalSets: number;
+  workout: import("@/lib/training/types").WorkoutTemplate;
+}) {
+  const [effort, setEffort] = useState<PerceivedEffort | null>(null);
   const totalVolume = loggedSets.reduce((sum, set) => sum + (set.weight ?? 0) * set.reps, 0);
+  const sessionResult = scoreSession(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), workout, demoSessions);
 
   return (
-    <section className="rounded-3xl border border-[#2563eb]/20 bg-[#e8eeff] p-5 shadow-card">
-      <p className="text-sm font-semibold text-[#2563eb]">Workout complete</p>
-      <h2 className="chunky-title mt-3 text-5xl font-black leading-none text-ink">Scorecard</h2>
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <ScoreMetric label="Sets logged" value={`${loggedSets.length}/${totalSets}`} />
-        <ScoreMetric label="Volume" value={`${Math.round(totalVolume).toLocaleString()} lb`} />
+    <section className="space-y-3">
+      <div className="rounded-3xl border border-[#2563eb]/20 bg-[#e8eeff] p-5 shadow-card">
+        <p className="text-sm font-semibold text-[#2563eb]">Workout complete</p>
+        <h2 className="chunky-title mt-3 text-5xl font-black leading-none text-ink">Scorecard</h2>
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          <ScoreMetric label="Sets" value={`${loggedSets.length}/${totalSets}`} />
+          <ScoreMetric label="Volume" value={`${Math.round(totalVolume / 1000 * 10) / 10}k lb`} />
+          <ScoreMetric label="Score" value={`${sessionResult.score}`} />
+        </div>
+        <p className="mono-copy mt-3 text-xs leading-5 text-[#2563eb]/80">{sessionResult.context}</p>
       </div>
+
+      <div className="rounded-3xl border border-black/6 bg-white p-5 shadow-card">
+        <p className="text-sm font-bold text-ink">How did that feel?</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {EFFORT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setEffort(option.value)}
+              className={`tap-target rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
+                effort === option.value
+                  ? "border-[#2563eb]/30 bg-[#2563eb] text-white"
+                  : "border-black/8 bg-surface text-ink"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Link
         href="/"
-        className="mt-5 flex w-full items-center justify-center rounded-3xl bg-ink py-4 text-lg font-black text-white shadow-card"
+        className="flex w-full items-center justify-center rounded-3xl bg-ink py-4 text-lg font-black text-white shadow-card"
       >
         Back to home
       </Link>

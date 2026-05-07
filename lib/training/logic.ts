@@ -144,14 +144,20 @@ export function getSuggestedSet(planned: PlannedExercise, setIndex: number, sess
   };
 }
 
-export function getRestSeconds(planned: PlannedExercise): number {
+export function getRestSeconds(planned: PlannedExercise, loggedReps?: number): number {
   const exercise = getExercise(planned.exerciseId);
   const isCore = exercise.movementPattern.startsWith("core_");
   const isCompound = exercise.movementPattern !== "isolation" && !isCore;
 
-  if (isCore) return 60;
-  if (planned.intensity === "hard" && isCompound) return 120;
-  return 75;
+  let base: number;
+  if (isCore) base = 60;
+  else if (planned.intensity === "hard" && isCompound) base = 120;
+  else base = 75;
+
+  if (loggedReps === undefined) return base;
+  if (loggedReps >= planned.repRange[1]) return Math.max(45, base - 15);
+  if (loggedReps < planned.repRange[0]) return base + 30;
+  return base;
 }
 
 export function getExerciseStats(exerciseId: string, sessions: WorkoutSession[]): ExerciseStats {
@@ -272,13 +278,178 @@ export function calculateRecovery(sessions: WorkoutSession[], today = new Date()
   });
 }
 
+export type SetFeedback = {
+  message: string;
+  tone: "positive" | "neutral" | "caution";
+};
+
+export function getSetFeedback(
+  loggedReps: number,
+  planned: PlannedExercise,
+  sessionExerciseSets: Array<{ reps: number }>,
+  priorSets: PerformedSet[]
+): SetFeedback {
+  const [low, high] = planned.repRange;
+  const prevSessionReps = sessionExerciseSets[sessionExerciseSets.length - 1]?.reps;
+  const bestPrior = priorSets.length
+    ? Math.max(...priorSets.map((s) => s.weight * s.reps))
+    : null;
+
+  if (prevSessionReps !== undefined && loggedReps <= prevSessionReps - 2) {
+    return { message: "Notable drop from last set — take the full rest.", tone: "caution" };
+  }
+  if (loggedReps < low) {
+    return { message: "Short of target. Hold this weight and rebuild the range.", tone: "caution" };
+  }
+  if (loggedReps > high && sessionExerciseSets.length === 0) {
+    return { message: "Above target — consider adding weight next set.", tone: "positive" };
+  }
+  if (bestPrior !== null) {
+    const currentBest = priorSets.length ? Math.max(...priorSets.map((s) => s.weight * s.reps)) : 0;
+    if (currentBest > bestPrior * 1.05) {
+      return { message: "New best volume. Earn the full range before jumping weight.", tone: "positive" };
+    }
+  }
+  if (loggedReps >= high) {
+    return { message: "Top of range — match or better next set.", tone: "positive" };
+  }
+  return { message: "On track. Match or beat next set.", tone: "neutral" };
+}
+
+export type SessionScore = {
+  score: number;
+  context: string;
+};
+
+export function scoreSession(
+  loggedSets: Array<{ exerciseId: string; weight: number | null; reps: number }>,
+  workout: WorkoutTemplate,
+  sessions: WorkoutSession[]
+): SessionScore {
+  const plannedSets = workout.exercises.reduce((sum, ex) => sum + ex.targetSets, 0);
+  const completionPts = Math.min(40, Math.round((loggedSets.length / plannedSets) * 40));
+
+  const repQualityPts = Math.round(
+    (loggedSets.reduce((sum, logged) => {
+      const planned = workout.exercises.find((ex) => ex.exerciseId === logged.exerciseId);
+      if (!planned) return sum + 1;
+      const [low, high] = planned.repRange;
+      if (logged.reps >= low) return sum + 1;
+      return sum + 0.5;
+    }, 0) /
+      Math.max(1, loggedSets.length)) *
+      40
+  );
+
+  const priorSame = [...sessions]
+    .filter((s) => s.status === "completed" && s.templateId === workout.id)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  const currentVolume = loggedSets.reduce((sum, s) => sum + (s.weight ?? 0) * s.reps, 0);
+  const priorVolume = priorSame ? calculateSetVolume(priorSame.performedSets) : null;
+
+  let volumePts = 10;
+  let comparison = "";
+  if (priorVolume !== null && priorVolume > 0) {
+    const pct = ((currentVolume - priorVolume) / priorVolume) * 100;
+    if (pct > 2) { volumePts = 20; comparison = "best session yet"; }
+    else if (pct >= -2) { volumePts = 10; comparison = "matched last time"; }
+    else { volumePts = 0; comparison = "down from last time"; }
+  }
+
+  const score = Math.min(100, completionPts + repQualityPts + volumePts);
+  const context = comparison
+    ? `${score >= 80 ? "Strong" : score >= 65 ? "Solid" : "Decent"} work — ${comparison}.`
+    : "First session logged. Baseline set.";
+
+  return { score, context };
+}
+
+export function detectPlateau(exerciseId: string, sessions: WorkoutSession[], threshold = 3): string | null {
+  const relevant = [...sessions]
+    .filter((s) => s.status === "completed" && s.performedSets.some((p) => p.exerciseId === exerciseId))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, threshold);
+
+  if (relevant.length < threshold) return null;
+
+  const volumes = relevant.map((s) =>
+    calculateSetVolume(s.performedSets.filter((p) => p.exerciseId === exerciseId))
+  );
+
+  const improved = volumes.slice(0, -1).some((v, i) => v > volumes[i + 1]);
+  return improved ? null : getExercise(exerciseId).name;
+}
+
+export function detectProgressStreak(exerciseId: string, sessions: WorkoutSession[], threshold = 2): { exerciseName: string; count: number } | null {
+  const relevant = [...sessions]
+    .filter((s) => s.status === "completed" && s.performedSets.some((p) => p.exerciseId === exerciseId))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  if (relevant.length < threshold + 1) return null;
+
+  const volumes = relevant.map((s) =>
+    calculateSetVolume(s.performedSets.filter((p) => p.exerciseId === exerciseId))
+  );
+
+  let streak = 0;
+  for (let i = 0; i < volumes.length - 1; i++) {
+    if (volumes[i] > volumes[i + 1]) streak++;
+    else break;
+  }
+
+  return streak >= threshold ? { exerciseName: getExercise(exerciseId).name, count: streak } : null;
+}
+
 export function generateInsights(sessions: WorkoutSession[], today = new Date()): Insight[] {
   const volume = calculateWeeklyMuscleVolume(sessions, today);
-  const completedThisWeek = sessions.filter((session) => {
-    const age = Math.floor((today.getTime() - new Date(session.date).getTime()) / 86_400_000);
-    return session.status === "completed" && age <= 7;
-  }).length;
+  const weekly = getWeeklySummary(sessions, today);
+  const completedThisWeek = weekly.completedSessions;
   const insights: Insight[] = [];
+
+  // Plateau detection — check exercises from most recent session
+  const recentSession = [...sessions]
+    .filter((s) => s.status === "completed")
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (recentSession) {
+    const exerciseIds = [...new Set(recentSession.performedSets.map((s) => s.exerciseId))];
+    for (const id of exerciseIds) {
+      const plateau = detectPlateau(id, sessions);
+      if (plateau) {
+        insights.push({
+          id: `plateau-${id}`,
+          type: "plateau",
+          tone: "tough_love",
+          title: "Plateau detected",
+          message: `${plateau} hasn't moved in 3 sessions. Try a drop set, change the rep range, or add a set.`
+        });
+        break;
+      }
+    }
+    for (const id of exerciseIds) {
+      const streak = detectProgressStreak(id, sessions);
+      if (streak) {
+        insights.push({
+          id: `streak-${id}`,
+          type: "streak",
+          tone: "encouraging",
+          title: "Progression streak",
+          message: `${streak.exerciseName} is up ${streak.count} sessions running. Don't change what's working.`
+        });
+        break;
+      }
+    }
+  }
+
+  // Deload signal
+  if (weekly.volumeChangePercent !== null && weekly.volumeChangePercent > 20) {
+    insights.push({
+      id: "deload-signal",
+      type: "deload",
+      tone: "tough_love",
+      title: "Volume spike",
+      message: `Weekly volume is up ${weekly.volumeChangePercent}% over last week. Consider a lighter session before recovery starts limiting gains.`
+    });
+  }
 
   const underTarget = volume.filter((item) => item.status === "under_target" && ["chest", "lats", "quads", "hamstrings", "glutes"].includes(item.muscleId));
   if (underTarget.length > 0) {
@@ -323,7 +494,7 @@ export function generateInsights(sessions: WorkoutSession[], today = new Date())
     });
   }
 
-  return insights.slice(0, 4);
+  return insights.slice(0, 6);
 }
 
 function sharesPrimaryMuscle(candidate: Exercise, original: Exercise): boolean {
