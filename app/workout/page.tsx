@@ -1,8 +1,10 @@
 import { WorkoutLogger } from "@/components/workout-logger";
-import { getTodayWorkout } from "@/lib/training/logic";
+import { getSessions } from "@/lib/db/queries";
+import { getNextWorkout } from "@/lib/training/logic";
 
-export default function WorkoutPage() {
-  const workout = getTodayWorkout(new Date("2026-05-05T12:00:00"));
+export default async function WorkoutPage() {
+  const sessions = await getSessions();
+  const workout = getNextWorkout(sessions);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden bg-surface px-4 pb-8 pt-6 text-ink" style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom))" }}>

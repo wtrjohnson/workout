@@ -2,7 +2,7 @@
 
 import { Clock, Repeat2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
 import { demoSessions } from "@/lib/training/data";
 import {
@@ -38,6 +38,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
   const [loggedSets, setLoggedSets] = useState<LoggedSet[]>([]);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [setFeedback, setSetFeedback] = useState<import("@/lib/training/logic").SetFeedback | null>(null);
+  const startTimeRef = useRef(Date.now());
 
   const activeStep = steps[activeStepIndex];
   const currentExerciseId = swaps[activeStep.planned.exerciseId] ?? activeStep.planned.exerciseId;
@@ -120,7 +121,16 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
   }
 
   if (mode === "complete") {
-    return <WorkoutScorecard loggedSets={loggedSets} totalSets={steps.length} workout={workout} />;
+    return (
+      <WorkoutScorecard
+        loggedSets={loggedSets}
+        totalSets={steps.length}
+        workout={workout}
+        painFlags={painFlags}
+        swaps={swaps}
+        startTime={startTimeRef.current}
+      />
+    );
   }
 
   if (mode === "resting") {
@@ -487,18 +497,53 @@ const EFFORT_OPTIONS: Array<{ value: PerceivedEffort; label: string }> = [
   { value: "very_hard", label: "Wrecked" }
 ];
 
+type SaveStatus = "saving" | "saved" | "error";
+
 function WorkoutScorecard({
   loggedSets,
   totalSets,
-  workout
+  workout,
+  painFlags,
+  swaps,
+  startTime
 }: {
   loggedSets: LoggedSet[];
   totalSets: number;
   workout: import("@/lib/training/types").WorkoutTemplate;
+  painFlags: string[];
+  swaps: Record<string, string>;
+  startTime: number;
 }) {
   const [effort, setEffort] = useState<PerceivedEffort | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saving");
   const totalVolume = loggedSets.reduce((sum, set) => sum + (set.weight ?? 0) * set.reps, 0);
   const sessionResult = scoreSession(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), workout, demoSessions);
+
+  useEffect(() => {
+    const durationMinutes = Math.round((Date.now() - startTime) / 60_000);
+
+    fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        templateKey: workout.id,
+        date: new Date().toISOString(),
+        durationMinutes: durationMinutes > 0 ? durationMinutes : null,
+        notes: null,
+        painFlags,
+        perceivedEffort: effort,
+        swappedExercises: swaps,
+        sets: loggedSets.map((s) => ({
+          exerciseId: s.exerciseId,
+          setNumber: s.setNumber,
+          weight: s.weight ?? 0,
+          reps: s.reps
+        }))
+      })
+    })
+      .then((res) => setSaveStatus(res.ok ? "saved" : "error"))
+      .catch(() => setSaveStatus("error"));
+  }, []);
 
   return (
     <section className="space-y-3">
@@ -511,6 +556,9 @@ function WorkoutScorecard({
           <ScoreMetric label="Score" value={`${sessionResult.score}`} />
         </div>
         <p className="mono-copy mt-3 text-xs leading-5 text-[#2563eb]/80">{sessionResult.context}</p>
+        <p className={`mono-copy mt-2 text-xs ${saveStatus === "saved" ? "text-[#16a34a]" : saveStatus === "error" ? "text-[#dc2626]" : "text-[#2563eb]/60"}`}>
+          {saveStatus === "saving" ? "Saving session…" : saveStatus === "saved" ? "Session saved" : "Save failed — check connection"}
+        </p>
       </div>
 
       <div className="rounded-3xl border border-black/6 bg-white p-5 shadow-card">

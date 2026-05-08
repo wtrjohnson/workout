@@ -3,21 +3,23 @@ import Link from "next/link";
 import { BottomNav } from "@/components/bottom-nav";
 import { WeeklySetsChart, LoadTrendChart } from "@/components/home-charts";
 import { LiftProgressChart } from "@/components/progress-charts";
-import { demoSessions, exercises } from "@/lib/training/data";
-import { generateInsights, getTodayWorkout, getWeeklySummary, suggestProgression } from "@/lib/training/logic";
+import { getSessions } from "@/lib/db/queries";
+import { exercises } from "@/lib/training/data";
+import { generateInsights, getNextWorkout, getWeeklySummary, suggestProgression } from "@/lib/training/logic";
 
-function getStreak(sessions: typeof demoSessions): number {
+function getStreak(sessions: Awaited<ReturnType<typeof getSessions>>): number {
   return sessions.filter((s) => s.status === "completed").length;
 }
 
-export default function HomePage() {
-  const today = new Date("2026-05-05T12:00:00");
-  const workout = getTodayWorkout(today);
-  const insights = generateInsights(demoSessions, today);
+export default async function HomePage() {
+  const sessions = await getSessions();
+  const today = new Date();
+  const workout = getNextWorkout(sessions);
+  const insights = generateInsights(sessions, today);
   const totalSets = workout.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0);
   const firstLift = workout.exercises[0];
-  const weeklySummary = getWeeklySummary(demoSessions, today);
-  const streak = getStreak(demoSessions);
+  const weeklySummary = getWeeklySummary(sessions, today);
+  const streak = getStreak(sessions);
 
   const dateLabel = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const mainLiftName = exercises.find((e) => e.id === firstLift.exerciseId)?.name ?? firstLift.exerciseId;
@@ -51,7 +53,7 @@ export default function HomePage() {
               <span className="ml-1 text-sm font-medium text-white/70">sets</span>
             </div>
           </div>
-          <p className="mono-copy mt-3 text-xs leading-5 text-white/70">{suggestProgression(firstLift, demoSessions)}</p>
+          <p className="mono-copy mt-3 text-xs leading-5 text-white/70">{suggestProgression(firstLift, sessions)}</p>
           <Link
             href="/workout"
             className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-[#2563eb]"
@@ -69,7 +71,7 @@ export default function HomePage() {
           <h2 className="chunky-title mt-1 text-2xl font-black leading-none text-ink">{mainLiftName}</h2>
           <p className="mono-copy mt-0.5 text-xs text-label">Volume over recent sessions</p>
           <div className="mt-3">
-            <LiftProgressChart sessions={demoSessions} exerciseId={firstLift.exerciseId} />
+            <LiftProgressChart sessions={sessions} exerciseId={firstLift.exerciseId} />
           </div>
         </div>
       </section>
@@ -81,7 +83,7 @@ export default function HomePage() {
           completedSets={weeklySummary.completedSets}
           plannedSets={totalSets}
         />
-        <LoadTrendChart sessions={demoSessions} />
+        <LoadTrendChart sessions={sessions} />
       </section>
 
       {/* Coach feed */}

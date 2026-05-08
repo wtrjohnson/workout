@@ -24,6 +24,7 @@ export const goalPriorityEnum = pgEnum("goal_priority", [
 
 export const workoutStatusEnum = pgEnum("workout_status", ["planned", "completed", "missed"]);
 
+// Kept for future multi-user expansion — not actively used yet
 export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
@@ -54,64 +55,33 @@ export const exercises = pgTable("exercises", {
   difficulty: text("difficulty").notNull()
 });
 
-export const programs = pgTable("programs", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userProfileId: uuid("user_profile_id").notNull().references(() => userProfiles.id),
-  name: text("name").notNull(),
-  goalPriority: goalPriorityEnum("goal_priority").notNull().default("muscle_gain"),
-  schedule: jsonb("schedule").$type<string[]>().notNull(),
-  progressionStrategy: text("progression_strategy").notNull().default("double_progression"),
-  createdAt: timestamp("created_at").notNull().defaultNow()
-});
-
-export const workoutTemplates = pgTable("workout_templates", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  programId: uuid("program_id").notNull().references(() => programs.id),
-  dayKey: text("day_key").notNull(),
-  title: text("title").notNull(),
-  focus: text("focus").notNull(),
-  plannedExercises: jsonb("planned_exercises").$type<
-    Array<{ exerciseId: string; targetSets: number; repRange: [number, number]; intensity: string }>
-  >().notNull()
-});
-
+// Core session tables — single-user, no FK to userProfiles or DB workout templates
 export const workoutSessions = pgTable("workout_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userProfileId: uuid("user_profile_id").notNull().references(() => userProfiles.id),
-  workoutTemplateId: uuid("workout_template_id").references(() => workoutTemplates.id),
+  templateKey: text("template_key").notNull(),
   date: timestamp("date").notNull().defaultNow(),
-  status: workoutStatusEnum("status").notNull().default("planned"),
+  status: workoutStatusEnum("status").notNull().default("completed"),
   durationMinutes: integer("duration_minutes"),
   notes: text("notes"),
-  painFlags: jsonb("pain_flags").$type<string[]>().notNull().default([])
+  painFlags: jsonb("pain_flags").$type<string[]>().notNull().default([]),
+  perceivedEffort: text("perceived_effort"),
+  swappedExercises: jsonb("swapped_exercises").$type<Record<string, string>>().notNull().default({})
 });
 
 export const performedSets = pgTable("performed_sets", {
   id: uuid("id").primaryKey().defaultRandom(),
   workoutSessionId: uuid("workout_session_id").notNull().references(() => workoutSessions.id),
-  exerciseId: text("exercise_id").notNull().references(() => exercises.id),
+  exerciseId: text("exercise_id").notNull(),
   setNumber: integer("set_number").notNull(),
   weight: real("weight").notNull(),
-  reps: integer("reps").notNull(),
-  rpe: real("rpe"),
-  hitFailure: boolean("hit_failure").notNull().default(false)
+  reps: integer("reps").notNull()
 });
 
+// Kept for future use — not actively written to yet
 export const progressionRules = pgTable("progression_rules", {
   id: uuid("id").primaryKey().defaultRandom(),
-  exerciseId: text("exercise_id").references(() => exercises.id),
+  exerciseId: text("exercise_id"),
   strategy: text("strategy").notNull().default("double_progression"),
   incrementLb: integer("increment_lb").notNull().default(5),
   notes: text("notes")
-});
-
-export const insights = pgTable("insights", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userProfileId: uuid("user_profile_id").notNull().references(() => userProfiles.id),
-  type: text("type").notNull(),
-  tone: text("tone").notNull(),
-  title: text("title").notNull(),
-  message: text("message").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  dismissedAt: timestamp("dismissed_at")
 });

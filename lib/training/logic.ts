@@ -20,6 +20,18 @@ export function getTodayWorkout(date = new Date()): WorkoutTemplate {
   return workoutTemplates[dayIndex % workoutTemplates.length];
 }
 
+export function getNextWorkout(sessions: WorkoutSession[]): WorkoutTemplate {
+  const lastCompleted = [...sessions]
+    .filter((s) => s.status === "completed")
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+  if (!lastCompleted) return workoutTemplates[0];
+
+  const lastIndex = workoutTemplates.findIndex((t) => t.id === lastCompleted.templateId);
+  const nextIndex = lastIndex === -1 ? 0 : (lastIndex + 1) % workoutTemplates.length;
+  return workoutTemplates[nextIndex];
+}
+
 export function getExercise(id: string): Exercise {
   const exercise = exerciseById.get(id);
   if (!exercise) {
@@ -119,6 +131,17 @@ export function getSuggestedSet(planned: PlannedExercise, setIndex: number, sess
   const topRepTarget = planned.repRange[1];
   const allTopRange = lastSets.length >= planned.targetSets && lastSets.every((set) => set.reps >= topRepTarget);
   const anyBelowRange = lastSets.some((set) => set.reps < planned.repRange[0]);
+
+  // Bodyweight / timed exercises: never suggest adding weight — only progress duration or reps
+  if (matchingSet.weight === 0) {
+    return {
+      weight: 0,
+      reps: allTopRange ? matchingSet.reps + 5 : matchingSet.reps,
+      reason: allTopRange
+        ? "Add 5 seconds (or reps) — you owned the target last time."
+        : "Match last session's duration or rep count."
+    };
+  }
 
   if (allTopRange) {
     const jump = matchingSet.weight < 50 ? 5 : 10;
