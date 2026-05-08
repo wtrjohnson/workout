@@ -148,14 +148,17 @@ export function getRestSeconds(planned: PlannedExercise, loggedReps?: number): n
   const exercise = getExercise(planned.exerciseId);
   const isCore = exercise.movementPattern.startsWith("core_");
   const isCompound = exercise.movementPattern !== "isolation" && !isCore;
+  // Main lifts: 5-6 rep range, heavy compound — need full 2:30 recovery
+  const isMainLift = isCompound && planned.intensity === "hard" && planned.repRange[1] <= 6;
 
   let base: number;
-  if (isCore) base = 60;
-  else if (planned.intensity === "hard" && isCompound) base = 120;
-  else base = 75;
+  if (isCore) base = 30;
+  else if (isMainLift) base = 150;
+  else if (planned.intensity === "hard" && isCompound) base = 90;
+  else base = 45;
 
   if (loggedReps === undefined) return base;
-  if (loggedReps >= planned.repRange[1]) return Math.max(45, base - 15);
+  if (loggedReps >= planned.repRange[1]) return Math.max(30, base - 15);
   if (loggedReps < planned.repRange[0]) return base + 30;
   return base;
 }
