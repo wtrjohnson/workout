@@ -196,6 +196,93 @@ export const exercises: Exercise[] = [
     planetFitnessReady: true,
     difficulty: "beginner",
     jointStress: ["elbow", "wrist"]
+  },
+  {
+    id: "db-deadlift",
+    name: "Dumbbell Deadlift",
+    equipment: ["dumbbell"],
+    movementPattern: "hinge",
+    primaryMuscles: ["hamstrings", "glutes", "lower_back"],
+    secondaryMuscles: ["upper_back", "quads"],
+    techniqueCues: ["Push hips back to initiate.", "Keep dumbbells close to legs.", "Drive hips through at the top.", "Control the descent — don't let it turn into a squat."],
+    alternatives: ["db-romanian-deadlift", "smith-squat"],
+    planetFitnessReady: true,
+    difficulty: "intermediate",
+    jointStress: ["lower_back"]
+  },
+  {
+    id: "db-overhead-press",
+    name: "Dumbbell Overhead Press",
+    equipment: ["dumbbell"],
+    movementPattern: "vertical_push",
+    primaryMuscles: ["front_delts", "side_delts"],
+    secondaryMuscles: ["triceps", "upper_back"],
+    techniqueCues: ["Start at shoulder height.", "Press straight up — avoid flaring elbows wide.", "Lock out overhead without arching lower back."],
+    alternatives: ["machine-shoulder-press", "cable-lateral-raise"],
+    planetFitnessReady: true,
+    difficulty: "intermediate",
+    jointStress: ["shoulder"]
+  },
+  {
+    id: "machine-row",
+    name: "Machine Row",
+    equipment: ["machine"],
+    movementPattern: "horizontal_pull",
+    primaryMuscles: ["upper_back", "lats"],
+    secondaryMuscles: ["biceps", "rear_delts"],
+    techniqueCues: ["Set chest pad firm.", "Pull elbows back — lead with the elbow, not the hand.", "Squeeze shoulder blades at the end range."],
+    alternatives: ["seated-cable-row", "lat-pulldown"],
+    planetFitnessReady: true,
+    difficulty: "beginner"
+  },
+  {
+    id: "db-lateral-raise",
+    name: "Dumbbell Lateral Raise",
+    equipment: ["dumbbell"],
+    movementPattern: "isolation",
+    primaryMuscles: ["side_delts"],
+    secondaryMuscles: ["upper_back"],
+    techniqueCues: ["Lead with elbows, not wrists.", "Slight forward lean improves muscle angle.", "Stop at shoulder height — going higher loads traps, not delts."],
+    alternatives: ["cable-lateral-raise", "machine-shoulder-press"],
+    planetFitnessReady: true,
+    difficulty: "beginner",
+    jointStress: ["shoulder"]
+  },
+  {
+    id: "plank",
+    name: "Front Plank",
+    equipment: ["bodyweight"],
+    movementPattern: "core_anti_extension",
+    primaryMuscles: ["abs"],
+    secondaryMuscles: ["glutes", "lower_back"],
+    techniqueCues: ["Squeeze glutes and abs together.", "Keep hips level — don't let them sag or pike.", "Breathe steadily through the hold."],
+    alternatives: ["cable-crunch", "dead-bug"],
+    planetFitnessReady: true,
+    difficulty: "beginner"
+  },
+  {
+    id: "side-plank",
+    name: "Side Plank",
+    equipment: ["bodyweight"],
+    movementPattern: "core_anti_rotation",
+    primaryMuscles: ["obliques"],
+    secondaryMuscles: ["abs", "glutes"],
+    techniqueCues: ["Stack feet or stagger for balance.", "Drive hips up — don't let them sag.", "Perform both sides for equal reps."],
+    alternatives: ["pallof-press", "dead-bug"],
+    planetFitnessReady: true,
+    difficulty: "beginner"
+  },
+  {
+    id: "dead-bug",
+    name: "Dead Bug",
+    equipment: ["bodyweight"],
+    movementPattern: "core_anti_extension",
+    primaryMuscles: ["abs"],
+    secondaryMuscles: ["lower_back", "obliques"],
+    techniqueCues: ["Press lower back into the floor throughout.", "Move opposite arm and leg together.", "Exhale as you lower — go slow."],
+    alternatives: ["plank", "cable-crunch"],
+    planetFitnessReady: true,
+    difficulty: "beginner"
   }
 ];
 
@@ -229,16 +316,17 @@ export const workoutTemplates: WorkoutTemplate[] = [
   {
     id: "full-body-c",
     day: "C",
-    title: "Full Body C",
-    focus: "Leg press, dumbbell press, delt/biceps/triceps balance",
+    title: "Day C: Deadlift Focus",
+    focus: "Deadlift, overhead press, horizontal row, core stability",
     exercises: [
-      { exerciseId: "leg-press", targetSets: 3, repRange: [10, 15], intensity: "hard" },
-      { exerciseId: "db-bench-press", targetSets: 3, repRange: [8, 12], intensity: "hard" },
-      { exerciseId: "lat-pulldown", targetSets: 3, repRange: [10, 12], intensity: "hard" },
-      { exerciseId: "cable-lateral-raise", targetSets: 2, repRange: [12, 20], intensity: "moderate" },
-      { exerciseId: "triceps-rope-pressdown", targetSets: 2, repRange: [10, 15], intensity: "moderate" },
-      { exerciseId: "db-curl", targetSets: 2, repRange: [10, 15], intensity: "moderate" },
-      { exerciseId: "cable-crunch", targetSets: 2, repRange: [10, 15], intensity: "hard" }
+      { exerciseId: "db-deadlift", targetSets: 4, repRange: [5, 6], intensity: "hard" },
+      { exerciseId: "db-overhead-press", targetSets: 3, repRange: [8, 10], intensity: "hard" },
+      { exerciseId: "machine-row", targetSets: 3, repRange: [8, 10], intensity: "hard" },
+      { exerciseId: "db-lateral-raise", targetSets: 3, repRange: [12, 15], intensity: "moderate" },
+      { exerciseId: "seated-leg-curl", targetSets: 2, repRange: [12, 15], intensity: "moderate" },
+      { exerciseId: "plank", targetSets: 3, repRange: [45, 50], intensity: "moderate" },
+      { exerciseId: "side-plank", targetSets: 2, repRange: [25, 30], intensity: "moderate" },
+      { exerciseId: "dead-bug", targetSets: 3, repRange: [12, 12], intensity: "moderate" }
     ]
   }
 ];

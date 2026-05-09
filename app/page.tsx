@@ -11,7 +11,7 @@ function getStreak(sessions: typeof demoSessions): number {
 }
 
 export default function HomePage() {
-  const today = new Date("2026-05-05T12:00:00");
+  const today = new Date("2026-05-09T12:00:00");
   const workout = getTodayWorkout(today);
   const insights = generateInsights(demoSessions, today);
   const totalSets = workout.exercises.reduce((sum, exercise) => sum + exercise.targetSets, 0);
