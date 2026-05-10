@@ -27,6 +27,9 @@ export const workoutStatusEnum = pgEnum("workout_status", ["planned", "completed
 export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
+  name: text("name"),
+  age: integer("age"),
+  weightLbs: real("weight_lbs"),
   goalPriority: goalPriorityEnum("goal_priority").notNull().default("muscle_gain"),
   trainingDaysPerWeek: integer("training_days_per_week").notNull().default(3),
   experienceLevel: text("experience_level").notNull().default("beginner"),
@@ -94,6 +97,7 @@ export const performedSets = pgTable("performed_sets", {
   weight: real("weight").notNull(),
   reps: integer("reps").notNull(),
   rpe: real("rpe"),
+  durationSeconds: integer("duration_seconds"),
   hitFailure: boolean("hit_failure").notNull().default(false)
 });
 
