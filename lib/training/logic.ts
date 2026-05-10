@@ -15,9 +15,9 @@ import type {
 
 const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
 
-export function getTodayWorkout(date = new Date()): WorkoutTemplate {
+export function getTodayWorkout(date = new Date(), templates = workoutTemplates): WorkoutTemplate {
   const dayIndex = Math.floor(date.getTime() / 86_400_000);
-  return workoutTemplates[dayIndex % workoutTemplates.length];
+  return templates[dayIndex % templates.length];
 }
 
 export function getExercise(id: string): Exercise {

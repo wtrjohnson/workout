@@ -4,7 +4,6 @@ import { Clock, Repeat2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
-import { demoSessions } from "@/lib/training/data";
 import {
   buildWorkoutSteps,
   findSubstitutions,
@@ -15,7 +14,7 @@ import {
   getSuggestedSet,
   scoreSession
 } from "@/lib/training/logic";
-import type { PerceivedEffort, WorkoutTemplate } from "@/lib/training/types";
+import type { PerceivedEffort, WorkoutSession, WorkoutTemplate } from "@/lib/training/types";
 
 type LoggedSet = {
   exerciseId: string;
@@ -29,7 +28,7 @@ type ActivePanel = "history" | "info" | null;
 
 const painOptions = ["shoulder", "knee", "lower_back"] as const;
 
-export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
+export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate; sessions: WorkoutSession[] }) {
   const steps = useMemo(() => buildWorkoutSteps(workout), [workout]);
   const [mode, setMode] = useState<WorkoutMode>("active");
   const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -43,19 +42,19 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
   const currentExerciseId = swaps[activeStep.planned.exerciseId] ?? activeStep.planned.exerciseId;
   const currentPlanned = { ...activeStep.planned, exerciseId: currentExerciseId };
   const currentExercise = getExercise(currentExerciseId);
-  const suggested = getSuggestedSet(currentPlanned, activeStep.setIndex, demoSessions);
+  const suggested = getSuggestedSet(currentPlanned, activeStep.setIndex, sessions);
   const [weight, setWeight] = useState<number | null>(suggested.weight);
   const [reps, setReps] = useState(suggested.reps);
   const restSeconds = getRestSeconds(currentPlanned);
   const [remainingRest, setRemainingRest] = useState(restSeconds);
 
   const substitutions = findSubstitutions(currentExerciseId, painFlags);
-  const exerciseStats = getExerciseStats(currentExerciseId, demoSessions);
+  const exerciseStats = getExerciseStats(currentExerciseId, sessions);
   const nextStep = steps[activeStepIndex + 1];
   const progress = Math.round((loggedSets.length / steps.length) * 100);
 
   useEffect(() => {
-    const nextSuggestion = getSuggestedSet(currentPlanned, activeStep.setIndex, demoSessions);
+    const nextSuggestion = getSuggestedSet(currentPlanned, activeStep.setIndex, sessions);
     setWeight(nextSuggestion.weight);
     setReps(nextSuggestion.reps);
     setRemainingRest(getRestSeconds(currentPlanned));
@@ -83,7 +82,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
     const sessionExerciseSets = loggedSets
       .filter((s) => s.exerciseId === currentExerciseId)
       .map((s) => ({ reps: s.reps, weight: s.weight ?? 0 }));
-    const priorSets = demoSessions
+    const priorSets = sessions
       .flatMap((s) => s.performedSets)
       .filter((s) => s.exerciseId === currentExerciseId);
     const feedback = getSetFeedback(reps, currentPlanned, sessionExerciseSets, priorSets);
@@ -120,7 +119,7 @@ export function WorkoutLogger({ workout }: { workout: WorkoutTemplate }) {
   }
 
   if (mode === "complete") {
-    return <WorkoutScorecard loggedSets={loggedSets} totalSets={steps.length} workout={workout} />;
+    return <WorkoutScorecard loggedSets={loggedSets} totalSets={steps.length} workout={workout} sessions={sessions} />;
   }
 
   if (mode === "resting") {
@@ -490,15 +489,17 @@ const EFFORT_OPTIONS: Array<{ value: PerceivedEffort; label: string }> = [
 function WorkoutScorecard({
   loggedSets,
   totalSets,
-  workout
+  workout,
+  sessions
 }: {
   loggedSets: LoggedSet[];
   totalSets: number;
   workout: import("@/lib/training/types").WorkoutTemplate;
+  sessions: WorkoutSession[];
 }) {
   const [effort, setEffort] = useState<PerceivedEffort | null>(null);
   const totalVolume = loggedSets.reduce((sum, set) => sum + (set.weight ?? 0) * set.reps, 0);
-  const sessionResult = scoreSession(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), workout, demoSessions);
+  const sessionResult = scoreSession(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), workout, sessions);
 
   return (
     <section className="space-y-3">
