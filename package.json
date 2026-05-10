@@ -9,9 +9,9 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "seed": "tsx scripts/seed.ts"
+    "db:push": "node --env-file=.env.local node_modules/.bin/drizzle-kit push",
+    "db:studio": "node --env-file=.env.local node_modules/.bin/drizzle-kit studio",
+    "seed": "node --env-file=.env.local node_modules/.bin/tsx scripts/seed.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
