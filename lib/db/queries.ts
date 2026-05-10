@@ -1,5 +1,5 @@
 import { db } from "./index";
-import { performedSets, workoutSessions, workoutTemplates } from "./schema";
+import { performedSets, programs, workoutSessions, workoutTemplates } from "./schema";
 import type { PlannedExercise, WorkoutSession, WorkoutTemplate } from "@/lib/training/types";
 
 export async function getSessionsWithSets(): Promise<WorkoutSession[]> {
@@ -36,6 +36,12 @@ export async function getSessionsWithSets(): Promise<WorkoutSession[]> {
         })),
     };
   });
+}
+
+export async function getProgram(): Promise<{ schedule: string[] } | null> {
+  if (!db) return null;
+  const rows = await db.select({ schedule: programs.schedule }).from(programs).limit(1);
+  return rows[0] ?? null;
 }
 
 export async function getTemplates(): Promise<WorkoutTemplate[]> {

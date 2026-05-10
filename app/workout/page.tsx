@@ -1,10 +1,18 @@
 import { WorkoutLogger } from "@/components/workout-logger";
 import { getSessionsWithSets, getTemplates } from "@/lib/db/queries";
-import { getTodayWorkout } from "@/lib/training/logic";
+import { getNextTemplate } from "@/lib/training/logic";
 
 export default async function WorkoutPage() {
   const [sessions, templates] = await Promise.all([getSessionsWithSets(), getTemplates()]);
-  const workout = getTodayWorkout(new Date(), templates);
+  const workout = templates.length > 0 ? getNextTemplate(sessions, templates) : null;
+
+  if (!workout) {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center bg-surface px-4 text-ink">
+        <p className="text-sm text-label">No program loaded. Run setup first.</p>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden bg-surface px-4 pb-8 pt-6 text-ink" style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom))" }}>

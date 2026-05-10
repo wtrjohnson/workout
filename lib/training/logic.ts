@@ -20,6 +20,29 @@ export function getTodayWorkout(date = new Date(), templates = workoutTemplates)
   return templates[dayIndex % templates.length];
 }
 
+export function getNextTemplate(sessions: WorkoutSession[], templates: WorkoutTemplate[]): WorkoutTemplate {
+  if (templates.length === 0) throw new Error("No templates available");
+  const completed = sessions.filter((s) => s.status === "completed").length;
+  return templates[completed % templates.length];
+}
+
+export function isScheduledDay(date: Date, schedule: string[]): boolean {
+  if (schedule.length === 0) return true;
+  const name = date.toLocaleDateString("en-US", { weekday: "long" });
+  return schedule.includes(name);
+}
+
+export function getNextScheduledDay(date: Date, schedule: string[]): string {
+  if (schedule.length === 0) return "tomorrow";
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const todayIdx = date.getDay();
+  for (let offset = 1; offset <= 7; offset++) {
+    const candidate = days[(todayIdx + offset) % 7];
+    if (schedule.includes(candidate)) return candidate;
+  }
+  return schedule[0];
+}
+
 export function getExercise(id: string): Exercise {
   const exercise = exerciseById.get(id);
   if (!exercise) {
