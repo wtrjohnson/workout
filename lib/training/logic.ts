@@ -26,16 +26,17 @@ export function getNextTemplate(sessions: WorkoutSession[], templates: WorkoutTe
   return templates[completed % templates.length];
 }
 
-export function isScheduledDay(date: Date, schedule: string[]): boolean {
+export function isScheduledDay(date: Date, schedule: string[], timeZone?: string): boolean {
   if (schedule.length === 0) return true;
-  const name = date.toLocaleDateString("en-US", { weekday: "long" });
+  const name = date.toLocaleDateString("en-US", { weekday: "long", ...(timeZone ? { timeZone } : {}) });
   return schedule.includes(name);
 }
 
-export function getNextScheduledDay(date: Date, schedule: string[]): string {
+export function getNextScheduledDay(date: Date, schedule: string[], timeZone?: string): string {
   if (schedule.length === 0) return "tomorrow";
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const todayIdx = date.getDay();
+  const todayName = date.toLocaleDateString("en-US", { weekday: "long", ...(timeZone ? { timeZone } : {}) });
+  const todayIdx = days.indexOf(todayName);
   for (let offset = 1; offset <= 7; offset++) {
     const candidate = days[(todayIdx + offset) % 7];
     if (schedule.includes(candidate)) return candidate;
