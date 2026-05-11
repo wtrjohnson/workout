@@ -1,5 +1,5 @@
 import { ArrowRight, Flame } from "lucide-react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import Link from "next/link";
 import { BottomNav } from "@/components/bottom-nav";
 import { SkipWorkoutButton } from "@/components/skip-workout-button";
@@ -23,25 +23,28 @@ function getStreak(sessions: WorkoutSession[]): number {
 
 export default async function HomePage() {
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
 
-  const [sessions, templates, program, cookieStore] = await Promise.all([
+  const [sessions, templates, program, cookieStore, headersList] = await Promise.all([
     getSessionsWithSets(),
     getTemplates(),
     getProgram(),
     cookies(),
+    headers(),
   ]);
 
+  const timeZone = headersList.get("x-vercel-ip-timezone") ?? "America/New_York";
+  const todayStr = today.toLocaleDateString("en-CA", { timeZone }); // YYYY-MM-DD in user's tz
+
   const schedule = program?.schedule ?? [];
-  const isWorkoutDay = isScheduledDay(today, schedule);
+  const isWorkoutDay = isScheduledDay(today, schedule, timeZone);
   const isSkipped = cookieStore.get("workout_skipped")?.value === todayStr;
   const workout = templates.length > 0 ? getNextTemplate(sessions, templates) : null;
-  const nextDay = getNextScheduledDay(today, schedule);
+  const nextDay = getNextScheduledDay(today, schedule, timeZone);
 
   const insights = generateInsights(sessions, today);
   const weeklySummary = getWeeklySummary(sessions, today);
   const streak = getStreak(sessions);
-  const dateLabel = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const dateLabel = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone });
 
   const showWorkout = isWorkoutDay && !isSkipped;
 
