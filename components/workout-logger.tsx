@@ -2,6 +2,7 @@
 
 import { Clock, Repeat2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
 import {
@@ -119,7 +120,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   }
 
   if (mode === "complete") {
-    return <WorkoutScorecard loggedSets={loggedSets} totalSets={steps.length} workout={workout} sessions={sessions} />;
+    return <WorkoutScorecard loggedSets={loggedSets} totalSets={steps.length} workout={workout} sessions={sessions} painFlags={painFlags} />;
   }
 
   if (mode === "resting") {
@@ -490,16 +491,36 @@ function WorkoutScorecard({
   loggedSets,
   totalSets,
   workout,
-  sessions
+  sessions,
+  painFlags,
 }: {
   loggedSets: LoggedSet[];
   totalSets: number;
   workout: import("@/lib/training/types").WorkoutTemplate;
   sessions: WorkoutSession[];
+  painFlags: string[];
 }) {
+  const router = useRouter();
   const [effort, setEffort] = useState<PerceivedEffort | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const totalVolume = loggedSets.reduce((sum, set) => sum + (set.weight ?? 0) * set.reps, 0);
   const sessionResult = scoreSession(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), workout, sessions);
+
+  useEffect(() => {
+    fetch("/api/workout/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        templateId: workout.id,
+        sets: loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })),
+        painFlags,
+        effort,
+      }),
+    })
+      .then((r) => { if (r.ok) setSaved(true); else setSaveError(true); })
+      .catch(() => setSaveError(true));
+  }, []);
 
   return (
     <section className="space-y-3">
@@ -534,12 +555,20 @@ function WorkoutScorecard({
         </div>
       </div>
 
-      <Link
-        href="/"
-        className="flex w-full items-center justify-center rounded-3xl bg-ink py-4 text-lg font-black text-white shadow-card"
+      {saveError && (
+        <p className="mono-copy text-center text-xs text-[#dc2626]">
+          Save failed — check your connection and try again.
+        </p>
+      )}
+
+      <button
+        type="button"
+        disabled={!saved && !saveError}
+        onClick={() => router.push("/")}
+        className="flex w-full items-center justify-center rounded-3xl bg-ink py-4 text-lg font-black text-white shadow-card disabled:opacity-40"
       >
-        Back to home
-      </Link>
+        {saved ? "Back to home" : saveError ? "Save failed — go home anyway" : "Saving…"}
+      </button>
     </section>
   );
 }
