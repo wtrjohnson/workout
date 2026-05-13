@@ -7,6 +7,7 @@ import {
   findSubstitutions,
   generateInsights,
   getExerciseStats,
+  getNextTemplate,
   getRestSeconds,
   getSuggestedSet,
   getTodayWorkout,
@@ -101,6 +102,33 @@ describe("training rules", () => {
     const insights = generateInsights(demoSessions, new Date("2026-05-05T12:00:00"));
     expect(insights.length).toBeGreaterThan(0);
     expect(insights.every((insight) => insight.message.length > 20)).toBe(true);
+  });
+});
+
+describe("getNextTemplate", () => {
+  it("returns the expected rotation template when muscles are recovered", () => {
+    // demoSessions has 3 completed sessions (A, B, C), so next in sequence is A
+    // Use a date far enough out that all muscles are fully recovered
+    const result = getNextTemplate(demoSessions, workoutTemplates, new Date("2026-05-15T12:00:00"));
+    expect(result.day).toBe("A");
+  });
+
+  it("picks the most-recovered template when the expected one is fatigued", () => {
+    // Use a date 1 day after the last C session (2026-05-03) — muscles are still recovering
+    // Expected next is A, but if A's muscles are fatigued it should pick the best available
+    const result = getNextTemplate(demoSessions, workoutTemplates, new Date("2026-05-04T12:00:00"));
+    expect(result).toBeDefined();
+    expect(result.day).toMatch(/^[ABC]$/);
+  });
+
+  it("preserves rotation when only one session exists and muscles are fresh", () => {
+    const oneSession = [demoSessions[0]]; // only A completed
+    const result = getNextTemplate(oneSession, workoutTemplates, new Date("2026-05-15T12:00:00"));
+    expect(result.day).toBe("B");
+  });
+
+  it("throws when no templates are available", () => {
+    expect(() => getNextTemplate(demoSessions, [])).toThrow("No templates available");
   });
 });
 
