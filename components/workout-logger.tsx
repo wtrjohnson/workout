@@ -15,6 +15,7 @@ import {
   getSuggestedSet,
   scoreSession
 } from "@/lib/training/logic";
+import type { WorkoutStep } from "@/lib/training/logic";
 import type { PerceivedEffort, WorkoutSession, WorkoutTemplate } from "@/lib/training/types";
 
 type LoggedSet = {
@@ -22,15 +23,28 @@ type LoggedSet = {
   setNumber: number;
   weight: number | null;
   reps: number;
+  durationSeconds?: number;
 };
+
+type MutableStep = WorkoutStep & { skippedOnce: boolean };
 
 type WorkoutMode = "active" | "resting" | "complete";
 type ActivePanel = "history" | "info" | null;
 
 const painOptions = ["shoulder", "knee", "lower_back"] as const;
 
+const EFFORT_OPTIONS: Array<{ value: PerceivedEffort; label: string }> = [
+  { value: "easy", label: "Easy" },
+  { value: "comfortable", label: "Comfortable" },
+  { value: "moderate", label: "Just right" },
+  { value: "hard", label: "Hard" },
+  { value: "very_hard", label: "Wrecked" }
+];
+
 export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate; sessions: WorkoutSession[] }) {
-  const steps = useMemo(() => buildWorkoutSteps(workout), [workout]);
+  const [steps, setSteps] = useState<MutableStep[]>(() =>
+    buildWorkoutSteps(workout).map((step) => ({ ...step, skippedOnce: false }))
+  );
   const [mode, setMode] = useState<WorkoutMode>("active");
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [painFlags, setPainFlags] = useState<string[]>([]);
@@ -39,15 +53,20 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [setFeedback, setSetFeedback] = useState<import("@/lib/training/logic").SetFeedback | null>(null);
 
+  // Rest timer: anchored to wall clock so backgrounding doesn't lose time
+  const [restEndTime, setRestEndTime] = useState<number | null>(null);
+  const [restDuration, setRestDuration] = useState(0);
+  const [remainingRest, setRemainingRest] = useState(0);
+
   const activeStep = steps[activeStepIndex];
   const currentExerciseId = swaps[activeStep.planned.exerciseId] ?? activeStep.planned.exerciseId;
   const currentPlanned = { ...activeStep.planned, exerciseId: currentExerciseId };
   const currentExercise = getExercise(currentExerciseId);
+  const isTimeBased = currentExercise.isTimeBased ?? false;
   const suggested = getSuggestedSet(currentPlanned, activeStep.setIndex, sessions);
   const [weight, setWeight] = useState<number | null>(suggested.weight);
   const [reps, setReps] = useState(suggested.reps);
-  const restSeconds = getRestSeconds(currentPlanned);
-  const [remainingRest, setRemainingRest] = useState(restSeconds);
+  const [duration, setDuration] = useState(30);
 
   const substitutions = findSubstitutions(currentExerciseId, painFlags);
   const exerciseStats = getExerciseStats(currentExerciseId, sessions);
@@ -58,36 +77,72 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     const nextSuggestion = getSuggestedSet(currentPlanned, activeStep.setIndex, sessions);
     setWeight(nextSuggestion.weight);
     setReps(nextSuggestion.reps);
-    setRemainingRest(getRestSeconds(currentPlanned));
   }, [activeStep.setIndex, currentExerciseId]);
 
-  useEffect(() => {
-    if (mode !== "resting") return;
-    if (remainingRest <= 0) {
-      goToNextStep();
+  function startRest(seconds: number) {
+    const dur = Math.max(1, seconds);
+    setRestDuration(dur);
+    setRemainingRest(dur);
+    setRestEndTime(Date.now() + dur * 1000);
+  }
+
+  function goToNextStep() {
+    setRestEndTime(null);
+    if (activeStepIndex >= steps.length - 1) {
+      setMode("complete");
       return;
     }
+    setActiveStepIndex((current) => current + 1);
+    setMode("active");
+  }
 
-    const timer = window.setTimeout(() => setRemainingRest((current) => current - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [mode, remainingRest]);
+  // Anchored interval: recalculates from wall clock on each tick
+  useEffect(() => {
+    if (mode !== "resting" || restEndTime === null) return;
+
+    function tick() {
+      const remaining = Math.max(0, Math.round((restEndTime! - Date.now()) / 1000));
+      setRemainingRest(remaining);
+      if (remaining <= 0) goToNextStep();
+    }
+
+    tick();
+    const timer = window.setInterval(tick, 500);
+    return () => window.clearInterval(timer);
+  }, [mode, restEndTime]);
+
+  // Sync timer when app returns from background
+  useEffect(() => {
+    if (mode !== "resting" || restEndTime === null) return;
+
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        const remaining = Math.max(0, Math.round((restEndTime! - Date.now()) / 1000));
+        setRemainingRest(remaining);
+        if (remaining <= 0) goToNextStep();
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [mode, restEndTime]);
 
   function completeSet() {
-    const completedSet: LoggedSet = {
-      exerciseId: currentExerciseId,
-      setNumber: activeStep.setIndex + 1,
-      weight,
-      reps
-    };
+    const completedSet: LoggedSet = isTimeBased
+      ? { exerciseId: currentExerciseId, setNumber: activeStep.setIndex + 1, weight: 0, reps: 0, durationSeconds: duration }
+      : { exerciseId: currentExerciseId, setNumber: activeStep.setIndex + 1, weight, reps };
 
-    const sessionExerciseSets = loggedSets
-      .filter((s) => s.exerciseId === currentExerciseId)
-      .map((s) => ({ reps: s.reps, weight: s.weight ?? 0 }));
-    const priorSets = sessions
-      .flatMap((s) => s.performedSets)
-      .filter((s) => s.exerciseId === currentExerciseId);
-    const feedback = getSetFeedback(reps, currentPlanned, sessionExerciseSets, priorSets);
-    setSetFeedback(feedback);
+    if (!isTimeBased) {
+      const sessionExerciseSets = loggedSets
+        .filter((s) => s.exerciseId === currentExerciseId)
+        .map((s) => ({ reps: s.reps, weight: s.weight ?? 0 }));
+      const priorSets = sessions
+        .flatMap((s) => s.performedSets)
+        .filter((s) => s.exerciseId === currentExerciseId);
+      setSetFeedback(getSetFeedback(reps, currentPlanned, sessionExerciseSets, priorSets));
+    } else {
+      setSetFeedback(null);
+    }
 
     setLoggedSets((current) => [...current, completedSet]);
 
@@ -96,18 +151,23 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
       return;
     }
 
-    setRemainingRest(getRestSeconds(currentPlanned, reps));
+    startRest(getRestSeconds(currentPlanned, isTimeBased ? undefined : reps));
     setMode("resting");
   }
 
-  function goToNextStep() {
-    if (activeStepIndex >= steps.length - 1) {
-      setMode("complete");
-      return;
-    }
-
-    setActiveStepIndex((current) => current + 1);
-    setMode("active");
+  function skipExercise() {
+    const exId = activeStep.planned.exerciseId;
+    setSteps((current) => {
+      const toDefer = current
+        .slice(activeStepIndex)
+        .filter((s) => s.planned.exerciseId === exId && !s.skippedOnce)
+        .map((s) => ({ ...s, skippedOnce: true }));
+      const remaining = current
+        .slice(activeStepIndex)
+        .filter((s) => s.planned.exerciseId !== exId || s.skippedOnce);
+      return [...current.slice(0, activeStepIndex), ...remaining, ...toDefer];
+    });
+    // activeStepIndex stays the same — next exercise now slides into that position
   }
 
   function togglePain(flag: string) {
@@ -120,19 +180,35 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   }
 
   if (mode === "complete") {
-    return <WorkoutScorecard loggedSets={loggedSets} totalSets={steps.length} workout={workout} sessions={sessions} painFlags={painFlags} />;
+    return (
+      <WorkoutScorecard
+        loggedSets={loggedSets}
+        totalSets={steps.length}
+        workout={workout}
+        sessions={sessions}
+        painFlags={painFlags}
+      />
+    );
   }
 
   if (mode === "resting") {
     return (
       <RestScreen
         remainingRest={remainingRest}
-        restSeconds={restSeconds}
+        restDuration={restDuration}
         nextLabel={nextStep ? getExercise(swaps[nextStep.planned.exerciseId] ?? nextStep.planned.exerciseId).name : "Scorecard"}
         nextSet={nextStep ? nextStep.setIndex + 1 : null}
         feedback={setFeedback}
-        onAddTime={() => setRemainingRest((current) => current + 30)}
-        onRemoveTime={() => setRemainingRest((current) => Math.max(0, current - 30))}
+        onAddTime={() => {
+          setRestDuration((d) => d + 30);
+          setRemainingRest((r) => r + 30);
+          setRestEndTime((t) => (t ?? Date.now()) + 30_000);
+        }}
+        onRemoveTime={() => {
+          setRestDuration((d) => Math.max(1, d - 30));
+          setRemainingRest((r) => Math.max(0, r - 30));
+          setRestEndTime((t) => (t ?? Date.now()) - 30_000);
+        }}
         onSkip={goToNextStep}
       />
     );
@@ -165,17 +241,30 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
       </section>
 
       <section className="rounded-3xl bg-[#2563eb] px-5 py-7">
-        <div className="grid grid-cols-2 gap-4">
-          <StepperValue
-            label="Weight"
-            value={weight}
-            unit="lbs"
-            step={5}
-            min={0}
-            onChange={setWeight}
-          />
-          <StepperValue label="Reps" value={reps} unit="reps" step={1} min={1} onChange={(value) => setReps(value ?? 1)} />
-        </div>
+        {isTimeBased ? (
+          <div className="flex justify-center">
+            <StepperValue
+              label="Duration"
+              value={duration}
+              unit="sec"
+              step={5}
+              min={5}
+              onChange={(value) => setDuration(value ?? 5)}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            <StepperValue
+              label="Weight"
+              value={weight}
+              unit="lbs"
+              step={5}
+              min={0}
+              onChange={setWeight}
+            />
+            <StepperValue label="Reps" value={reps} unit="reps" step={1} min={1} onChange={(value) => setReps(value ?? 1)} />
+          </div>
+        )}
       </section>
 
       <div className="flex items-center gap-3">
@@ -186,6 +275,15 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
         >
           Log set
         </button>
+        {!activeStep.skippedOnce && (
+          <button
+            className="tap-target rounded-3xl border border-black/8 bg-white px-4 py-4 text-sm font-black leading-none text-ink shadow-card"
+            onClick={skipExercise}
+            type="button"
+          >
+            Skip
+          </button>
+        )}
         <button
           className="grid size-16 place-items-center rounded-full border border-black/8 bg-white text-ink shadow-card"
           onClick={() => setActivePanel("history")}
@@ -199,7 +297,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
       {activePanel ? (
         <PanelOverlay title={activePanel === "history" ? "Exercise history" : "Exercise info"} onClose={() => setActivePanel(null)}>
           {activePanel === "history" ? (
-            <ExerciseStatsPanel stats={exerciseStats} suggestion={suggested.reason} />
+            <ExerciseStatsPanel stats={exerciseStats} suggestion={suggested.reason} isTimeBased={isTimeBased} />
           ) : (
             <ExerciseInfoPanel
               cues={currentExercise.techniqueCues}
@@ -298,7 +396,7 @@ function Triangle({ direction }: { direction: "up" | "down" }) {
 
 function RestScreen({
   remainingRest,
-  restSeconds,
+  restDuration,
   nextLabel,
   nextSet,
   feedback,
@@ -307,7 +405,7 @@ function RestScreen({
   onSkip
 }: {
   remainingRest: number;
-  restSeconds: number;
+  restDuration: number;
   nextLabel: string;
   nextSet: number | null;
   feedback: import("@/lib/training/logic").SetFeedback | null;
@@ -315,7 +413,7 @@ function RestScreen({
   onRemoveTime: () => void;
   onSkip: () => void;
 }) {
-  const progress = Math.max(0, Math.min(100, Math.round((remainingRest / restSeconds) * 100)));
+  const progress = restDuration > 0 ? Math.max(0, Math.min(100, Math.round((remainingRest / restDuration) * 100))) : 0;
   const feedbackColor =
     feedback?.tone === "positive" ? "text-[#16a34a]" :
     feedback?.tone === "caution" ? "text-[#d97706]" :
@@ -366,33 +464,49 @@ function RestScreen({
   );
 }
 
-function ExerciseStatsPanel({ stats, suggestion }: { stats: ReturnType<typeof getExerciseStats>; suggestion: string }) {
+function ExerciseStatsPanel({
+  stats,
+  suggestion,
+  isTimeBased
+}: {
+  stats: ReturnType<typeof getExerciseStats>;
+  suggestion: string;
+  isTimeBased: boolean;
+}) {
   return (
     <div>
       <p className="text-sm font-bold text-ink">Exercise history</p>
-      <div className="mt-3 rounded-2xl border border-black/6 bg-surface p-3">
-        <p className="mono-copy text-xs text-label">Suggestion</p>
-        <p className="mono-copy mt-1 text-sm leading-6 text-ink">{suggestion}</p>
-      </div>
+      {!isTimeBased && (
+        <div className="mt-3 rounded-2xl border border-black/6 bg-surface p-3">
+          <p className="mono-copy text-xs text-label">Suggestion</p>
+          <p className="mono-copy mt-1 text-sm leading-6 text-ink">{suggestion}</p>
+        </div>
+      )}
       {stats.lastSets.length > 0 ? (
         <>
           <div className="mt-3 rounded-2xl border border-black/6 bg-surface p-3">
             <p className="mono-copy text-xs text-label">Last time</p>
             <p className="mono-copy mt-1 text-sm leading-6 text-ink">
-              {stats.lastSets.map((set) => `${set.weight} x ${set.reps}`).join(", ")}
+              {stats.lastSets.map((set) =>
+                isTimeBased && set.durationSeconds != null
+                  ? `${set.durationSeconds}s`
+                  : `${set.weight} x ${set.reps}`
+              ).join(", ")}
             </p>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <StatTile label="Best set" value={stats.bestSet ? `${stats.bestSet.weight} x ${stats.bestSet.reps}` : "N/A"} />
-            <StatTile
-              label="Volume"
-              value={
-                stats.volumeChangePercent === null
-                  ? `${Math.round(stats.latestVolume).toLocaleString()}`
-                  : `${stats.volumeChangePercent >= 0 ? "+" : ""}${stats.volumeChangePercent}%`
-              }
-            />
-          </div>
+          {!isTimeBased && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <StatTile label="Best set" value={stats.bestSet ? `${stats.bestSet.weight} x ${stats.bestSet.reps}` : "N/A"} />
+              <StatTile
+                label="Volume"
+                value={
+                  stats.volumeChangePercent === null
+                    ? `${Math.round(stats.latestVolume).toLocaleString()}`
+                    : `${stats.volumeChangePercent >= 0 ? "+" : ""}${stats.volumeChangePercent}%`
+                }
+              />
+            </div>
+          )}
           <p className="mono-copy mt-3 text-xs leading-5 text-label">
             Logged {stats.totalSets} sets across {stats.sessionsLogged} sessions.
           </p>
@@ -480,13 +594,6 @@ function StatTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-const EFFORT_OPTIONS: Array<{ value: PerceivedEffort; label: string }> = [
-  { value: "easy", label: "Easy" },
-  { value: "moderate", label: "Just right" },
-  { value: "hard", label: "Hard" },
-  { value: "very_hard", label: "Wrecked" }
-];
-
 function WorkoutScorecard({
   loggedSets,
   totalSets,
@@ -496,31 +603,41 @@ function WorkoutScorecard({
 }: {
   loggedSets: LoggedSet[];
   totalSets: number;
-  workout: import("@/lib/training/types").WorkoutTemplate;
+  workout: WorkoutTemplate;
   sessions: WorkoutSession[];
   painFlags: string[];
 }) {
   const router = useRouter();
   const [effort, setEffort] = useState<PerceivedEffort | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const totalVolume = loggedSets.reduce((sum, set) => sum + (set.weight ?? 0) * set.reps, 0);
   const sessionResult = scoreSession(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), workout, sessions);
 
-  useEffect(() => {
-    fetch("/api/workout/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        templateId: workout.id,
-        sets: loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })),
-        painFlags,
-        effort,
-      }),
-    })
-      .then((r) => { if (r.ok) setSaved(true); else setSaveError(true); })
-      .catch(() => setSaveError(true));
-  }, []);
+  async function handleFinish() {
+    setSaving(true);
+    try {
+      const r = await fetch("/api/workout/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId: workout.id,
+          sets: loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })),
+          painFlags,
+          effort,
+        }),
+      });
+      if (r.ok) {
+        router.push("/");
+      } else {
+        setSaveError(true);
+        setSaving(false);
+      }
+    } catch {
+      setSaveError(true);
+      setSaving(false);
+    }
+  }
 
   return (
     <section className="space-y-3">
@@ -563,11 +680,11 @@ function WorkoutScorecard({
 
       <button
         type="button"
-        disabled={!saved && !saveError}
-        onClick={() => router.push("/")}
+        disabled={saving}
+        onClick={handleFinish}
         className="flex w-full items-center justify-center rounded-3xl bg-ink py-4 text-lg font-black text-white shadow-card disabled:opacity-40"
       >
-        {saved ? "Back to home" : saveError ? "Save failed — go home anyway" : "Saving…"}
+        {saving ? "Saving…" : saveError ? "Save failed — try again" : "Done"}
       </button>
     </section>
   );

@@ -137,6 +137,9 @@ async function createSchema() {
       notes        TEXT
     )`,
 
+    // add perceived_effort to existing workout_sessions tables
+    `ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS perceived_effort TEXT`,
+
     // insights
     `CREATE TABLE IF NOT EXISTS insights (
       id              UUID      PRIMARY KEY DEFAULT gen_random_uuid(),

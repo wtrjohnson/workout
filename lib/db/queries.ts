@@ -32,6 +32,7 @@ export async function getSessionsWithSets(): Promise<WorkoutSession[]> {
           setNumber: set.setNumber,
           weight: set.weight,
           reps: set.reps,
+          durationSeconds: set.durationSeconds ?? undefined,
           date: dateStr,
         })),
     };
