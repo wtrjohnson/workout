@@ -7,7 +7,7 @@ export async function POST(request: Request) {
 
   const { templateId, sets, painFlags, effort } = await request.json() as {
     templateId: string;
-    sets: Array<{ exerciseId: string; setNumber: number; weight: number; reps: number }>;
+    sets: Array<{ exerciseId: string; setNumber: number; weight: number; reps: number; durationSeconds?: number }>;
     painFlags: string[];
     effort?: string;
   };
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       date: new Date(),
       status: "completed",
       painFlags: painFlags ?? [],
+      perceivedEffort: effort ?? null,
     })
     .returning();
 
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
         setNumber: s.setNumber,
         weight: s.weight,
         reps: s.reps,
+        durationSeconds: s.durationSeconds ?? null,
       }))
     );
   }

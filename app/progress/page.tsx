@@ -2,9 +2,26 @@ import { AppShell } from "@/components/app-shell";
 import { DarkChartCard } from "@/components/dark-chart-card";
 import { MetricRing } from "@/components/metric-ring";
 import { LiftProgressChart, MuscleVolumeChart } from "@/components/progress-charts";
-import { muscles } from "@/lib/training/data";
+import { exercises, muscles } from "@/lib/training/data";
 import { getSessionsWithSets } from "@/lib/db/queries";
 import { calculateRecovery, calculateWeeklyMuscleVolume, getWeeklySummary } from "@/lib/training/logic";
+import type { WorkoutSession } from "@/lib/training/types";
+
+function primaryExerciseId(sessions: WorkoutSession[]): string {
+  const vol = new Map<string, number>();
+  for (const s of sessions) {
+    if (s.status !== "completed") continue;
+    for (const set of s.performedSets) {
+      vol.set(set.exerciseId, (vol.get(set.exerciseId) ?? 0) + set.weight * set.reps);
+    }
+  }
+  let bestId = "goblet-squat";
+  let bestVol = 0;
+  for (const [id, v] of vol) {
+    if (v > bestVol) { bestVol = v; bestId = id; }
+  }
+  return bestId;
+}
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   fresh: { bg: "bg-[#e8fdf0]", text: "text-[#16a34a]" },
@@ -22,6 +39,9 @@ export default async function ProgressPage() {
   const recovery = calculateRecovery(sessions, today);
   const weekly = getWeeklySummary(sessions, today);
 
+  const topExerciseId = primaryExerciseId(sessions);
+  const topExerciseName = exercises.find((e) => e.id === topExerciseId)?.name ?? topExerciseId;
+
   const readiness = Math.round((recovery.filter((item) => item.status === "fresh" || item.status === "ready").length / recovery.length) * 100);
   const volumeTarget = Math.round((volume.filter((item) => item.status === "on_track" || item.status === "high").length / volume.length) * 100);
   const consistency = Math.min(100, Math.round((weekly.completedSessions / 3) * 100));
@@ -34,8 +54,8 @@ export default async function ProgressPage() {
         <MetricRing label="Done" value={consistency} detail="sessions" accent="sand" size="sm" />
       </section>
 
-      <DarkChartCard title="Goblet squat volume" subtitle="Total load by session">
-        <LiftProgressChart sessions={sessions} exerciseId="goblet-squat" />
+      <DarkChartCard title={`${topExerciseName} volume`} subtitle="Total load by session">
+        <LiftProgressChart sessions={sessions} exerciseId={topExerciseId} />
       </DarkChartCard>
 
       <DarkChartCard title="Weekly muscle volume" subtitle="Set distribution by target area">

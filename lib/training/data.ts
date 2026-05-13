@@ -358,7 +358,8 @@ export const exercises: Exercise[] = [
     techniqueCues: ["Forearms and toes.", "Squeeze glutes and abs together.", "Don't let hips sag or pike."],
     alternatives: ["cable-crunch", "dead-bugs"],
     planetFitnessReady: true,
-    difficulty: "beginner"
+    difficulty: "beginner",
+    isTimeBased: true
   },
   {
     id: "side-plank-left",
@@ -370,7 +371,8 @@ export const exercises: Exercise[] = [
     techniqueCues: ["Stack feet or stagger.", "Drive hip up toward ceiling.", "Keep body in one straight line."],
     alternatives: ["pallof-press"],
     planetFitnessReady: true,
-    difficulty: "beginner"
+    difficulty: "beginner",
+    isTimeBased: true
   },
   {
     id: "side-plank-right",
@@ -382,7 +384,8 @@ export const exercises: Exercise[] = [
     techniqueCues: ["Stack feet or stagger.", "Drive hip up toward ceiling.", "Keep body in one straight line."],
     alternatives: ["pallof-press"],
     planetFitnessReady: true,
-    difficulty: "beginner"
+    difficulty: "beginner",
+    isTimeBased: true
   },
   {
     id: "dead-bugs",
@@ -394,7 +397,8 @@ export const exercises: Exercise[] = [
     techniqueCues: ["Press lower back into floor throughout.", "Extend opposite arm and leg slowly.", "Exhale as you lower, inhale to reset."],
     alternatives: ["front-plank", "pallof-press"],
     planetFitnessReady: true,
-    difficulty: "beginner"
+    difficulty: "beginner",
+    isTimeBased: true
   }
 ];
 

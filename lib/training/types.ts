@@ -69,6 +69,7 @@ export type Exercise = {
   planetFitnessReady: boolean;
   difficulty: "beginner" | "intermediate" | "advanced";
   jointStress?: ("shoulder" | "knee" | "lower_back" | "elbow" | "wrist")[];
+  isTimeBased?: boolean;
 };
 
 export type PlannedExercise = {
@@ -91,10 +92,11 @@ export type PerformedSet = {
   setNumber: number;
   weight: number;
   reps: number;
+  durationSeconds?: number;
   date: string;
 };
 
-export type PerceivedEffort = "easy" | "moderate" | "hard" | "very_hard";
+export type PerceivedEffort = "easy" | "comfortable" | "moderate" | "hard" | "very_hard";
 
 export type WorkoutSession = {
   id: string;
