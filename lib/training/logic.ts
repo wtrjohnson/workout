@@ -20,10 +20,40 @@ export function getTodayWorkout(date = new Date(), templates = workoutTemplates)
   return templates[dayIndex % templates.length];
 }
 
-export function getNextTemplate(sessions: WorkoutSession[], templates: WorkoutTemplate[]): WorkoutTemplate {
+export function getNextTemplate(sessions: WorkoutSession[], templates: WorkoutTemplate[], today = new Date()): WorkoutTemplate {
   if (templates.length === 0) throw new Error("No templates available");
+
   const completed = sessions.filter((s) => s.status === "completed").length;
-  return templates[completed % templates.length];
+  const expectedIndex = completed % templates.length;
+
+  const recovery = calculateRecovery(sessions, today);
+  const recoveryByMuscle = new Map(recovery.map((r) => [r.muscleId, r.score]));
+
+  function templateRecoveryScore(template: WorkoutTemplate): number {
+    const muscleIds = new Set(
+      template.exercises.flatMap((ex) => exerciseById.get(ex.exerciseId)?.primaryMuscles ?? [])
+    );
+    if (muscleIds.size === 0) return 100;
+    let total = 0;
+    for (const id of muscleIds) total += recoveryByMuscle.get(id) ?? 100;
+    return total / muscleIds.size;
+  }
+
+  const expected = templates[expectedIndex];
+
+  // Preserve the A→B→C rotation when muscles are sufficiently recovered
+  const READY_THRESHOLD = 60;
+  if (templateRecoveryScore(expected) >= READY_THRESHOLD) return expected;
+
+  // Otherwise pick the template whose primary muscles are most recovered,
+  // breaking ties by proximity to the expected rotation position
+  return [...templates]
+    .map((t, i) => ({
+      template: t,
+      score: templateRecoveryScore(t),
+      distance: (i - expectedIndex + templates.length) % templates.length
+    }))
+    .sort((a, b) => b.score - a.score || a.distance - b.distance)[0].template;
 }
 
 export function isScheduledDay(date: Date, schedule: string[], timeZone?: string): boolean {
