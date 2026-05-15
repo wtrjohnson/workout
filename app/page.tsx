@@ -1,3 +1,4 @@
+import pkg from "../package.json";
 import { ArrowRight, Flame } from "lucide-react";
 import { cookies, headers } from "next/headers";
 import Link from "next/link";
@@ -155,6 +156,8 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      <p className="mono-copy mt-6 text-center text-xs text-label/50">v{pkg.version}</p>
 
       <BottomNav />
     </main>
