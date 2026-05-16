@@ -54,7 +54,8 @@ export const exercises = pgTable("exercises", {
   techniqueCues: jsonb("technique_cues").$type<string[]>().notNull(),
   alternatives: jsonb("alternatives").$type<string[]>().notNull(),
   planetFitnessReady: boolean("planet_fitness_ready").notNull().default(true),
-  difficulty: text("difficulty").notNull()
+  difficulty: text("difficulty").notNull(),
+  isTimeBased: boolean("is_time_based").notNull().default(false)
 });
 
 export const programs = pgTable("programs", {

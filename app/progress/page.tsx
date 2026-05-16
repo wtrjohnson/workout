@@ -27,8 +27,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
   fresh: { bg: "bg-[#e8fdf0]", text: "text-[#16a34a]" },
   ready: { bg: "bg-[#e8eeff]", text: "text-[#2563eb]" },
   fatigued: { bg: "bg-[#fef3e2]", text: "text-[#d97706]" },
-  recovering: { bg: "bg-[#fef3e2]", text: "text-[#d97706]" },
-  overreached: { bg: "bg-[#fee2e2]", text: "text-[#dc2626]" }
+  very_fatigued: { bg: "bg-[#fee2e2]", text: "text-[#dc2626]" },
 };
 
 export default async function ProgressPage() {

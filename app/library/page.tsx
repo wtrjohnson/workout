@@ -1,17 +1,43 @@
+"use client";
+
 import { Search } from "lucide-react";
+import React, { useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { exercises } from "@/lib/training/data";
 
 export default function LibraryPage() {
+  const [query, setQuery] = useState("");
+
+  const filtered = query.trim()
+    ? exercises.filter((exercise) => {
+        const q = query.toLowerCase();
+        return (
+          exercise.name.toLowerCase().includes(q) ||
+          exercise.movementPattern.replaceAll("_", " ").includes(q) ||
+          exercise.primaryMuscles.some((m) => m.replaceAll("_", " ").includes(q)) ||
+          exercise.equipment.some((e) => e.replaceAll("_", " ").includes(q))
+        );
+      })
+    : exercises;
+
   return (
     <AppShell eyebrow="Exercise library" title="Planet Fitness lifts">
       <label className="flex items-center gap-2 rounded-full border border-black/8 bg-white px-4 py-3 shadow-card">
         <Search className="size-4 text-label" />
-        <input className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-label/60" placeholder="Search by lift, muscle, equipment" />
+        <input
+          className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-label/60"
+          placeholder="Search by lift, muscle, equipment"
+          value={query}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+        />
       </label>
 
+      {filtered.length === 0 && (
+        <p className="mono-copy text-center text-sm text-label">No exercises match &ldquo;{query}&rdquo;</p>
+      )}
+
       <section className="space-y-2">
-        {exercises.map((exercise) => (
+        {filtered.map((exercise) => (
           <article key={exercise.id} className="card-hover animate-rise-in rounded-2xl border border-black/6 bg-white p-4 shadow-card">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
