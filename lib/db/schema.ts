@@ -88,7 +88,8 @@ export const workoutSessions = pgTable("workout_sessions", {
   durationMinutes: integer("duration_minutes"),
   notes: text("notes"),
   painFlags: jsonb("pain_flags").$type<string[]>().notNull().default([]),
-  perceivedEffort: text("perceived_effort")
+  perceivedEffort: text("perceived_effort"),
+  swappedExerciseIds: jsonb("swapped_exercise_ids").$type<Record<string, string>>().notNull().default({})
 });
 
 export const performedSets = pgTable("performed_sets", {

@@ -10,6 +10,7 @@ import { exercises } from "@/lib/training/data";
 import { getSessionsWithSets, getTemplates, getProgram } from "@/lib/db/queries";
 import {
   generateInsights,
+  getBlockStatus,
   getNextTemplate,
   getNextScheduledDay,
   getWeeklySummary,
@@ -49,6 +50,7 @@ export default async function HomePage() {
 
   const insights = generateInsights(sessions, today);
   const weeklySummary = getWeeklySummary(sessions, today);
+  const blockStatus = getBlockStatus(sessions);
   const streak = getStreak(sessions);
   const dateLabel = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone });
 
@@ -115,9 +117,13 @@ export default async function HomePage() {
                 : `Recovery is part of the program. Next session: ${nextDay}.`}
             </p>
             {workout && (
-              <p className="mono-copy mt-1 text-xs text-label">
-                Up next: {workout.title}
-              </p>
+              <Link
+                href="/workout"
+                className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-black/8 bg-surface px-4 py-3 text-sm font-bold text-ink"
+              >
+                Start {workout.title} anyway
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
             )}
           </div>
         )}
@@ -161,6 +167,15 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {blockStatus.isDeload && (
+        <section className="rounded-2xl border border-[#7c3aed]/20 bg-[#f5f3ff] p-4">
+          <p className="text-sm font-bold text-[#5b21b6]">Deload week</p>
+          <p className="mono-copy mt-1 text-xs leading-5 text-[#7c3aed]/80">
+            Week 5 of the block. Cut load 20-30% and aim for 2 sets per exercise. Let the adaptation consolidate.
+          </p>
+        </section>
+      )}
 
       <p className="mono-copy mt-6 text-center text-xs text-label/50">v{pkg.version}</p>
 

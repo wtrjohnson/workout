@@ -7,11 +7,12 @@ const VALID_EFFORTS = new Set(["easy", "comfortable", "moderate", "hard", "very_
 export async function POST(request: Request) {
   if (!db) return NextResponse.json({ error: "no db" }, { status: 503 });
 
-  const { templateId, sets, painFlags, effort } = await request.json() as {
+  const { templateId, sets, painFlags, effort, swappedExerciseIds } = await request.json() as {
     templateId: string;
     sets: Array<{ exerciseId: string; setNumber: number; weight: number; reps: number; durationSeconds?: number }>;
     painFlags: string[];
     effort?: string;
+    swappedExerciseIds?: Record<string, string>;
   };
 
   if (!Array.isArray(sets)) {
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       status: "completed",
       painFlags: painFlags ?? [],
       perceivedEffort: effort ?? null,
+      swappedExerciseIds: swappedExerciseIds ?? {},
     })
     .returning();
 

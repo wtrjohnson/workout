@@ -1,3 +1,4 @@
+import { desc, eq } from "drizzle-orm";
 import { db } from "./index";
 import { performedSets, programs, workoutSessions, workoutTemplates } from "./schema";
 import type { PlannedExercise, WorkoutSession, WorkoutTemplate } from "@/lib/training/types";
@@ -25,6 +26,8 @@ export async function getSessionsWithSets(): Promise<WorkoutSession[]> {
       date: dateStr,
       status: session.status,
       notes: session.notes ?? undefined,
+      perceivedEffort: session.perceivedEffort as WorkoutSession["perceivedEffort"] ?? undefined,
+      swappedExerciseIds: (session.swappedExerciseIds as Record<string, string>) ?? {},
       performedSets: (setsBySession.get(session.id) ?? [])
         .sort((a, b) => a.setNumber - b.setNumber)
         .map((set) => ({
@@ -39,9 +42,116 @@ export async function getSessionsWithSets(): Promise<WorkoutSession[]> {
   });
 }
 
-export async function getProgram(): Promise<{ schedule: string[] } | null> {
+export type HistorySession = {
+  id: string;
+  date: Date;
+  status: string;
+  templateTitle: string | null;
+  templateFocus: string | null;
+  perceivedEffort: string | null;
+  painFlags: string[];
+  setCount: number;
+};
+
+export type HistorySessionDetail = HistorySession & {
+  performedSets: Array<{
+    exerciseId: string;
+    setNumber: number;
+    weight: number;
+    reps: number;
+    durationSeconds: number | null;
+  }>;
+  swappedExerciseIds: Record<string, string>;
+};
+
+export async function getSessionHistory(): Promise<HistorySession[]> {
+  if (!db) return [];
+
+  const rows = await db
+    .select({
+      id: workoutSessions.id,
+      date: workoutSessions.date,
+      status: workoutSessions.status,
+      templateTitle: workoutTemplates.title,
+      templateFocus: workoutTemplates.focus,
+      perceivedEffort: workoutSessions.perceivedEffort,
+      painFlags: workoutSessions.painFlags,
+    })
+    .from(workoutSessions)
+    .leftJoin(workoutTemplates, eq(workoutSessions.workoutTemplateId, workoutTemplates.id))
+    .where(eq(workoutSessions.status, "completed"))
+    .orderBy(desc(workoutSessions.date))
+    .limit(60);
+
+  const sets = await db.select({ sessionId: performedSets.workoutSessionId }).from(performedSets);
+  const setCountBySession = new Map<string, number>();
+  for (const s of sets) {
+    setCountBySession.set(s.sessionId, (setCountBySession.get(s.sessionId) ?? 0) + 1);
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    date: row.date,
+    status: row.status,
+    templateTitle: row.templateTitle ?? null,
+    templateFocus: row.templateFocus ?? null,
+    perceivedEffort: row.perceivedEffort ?? null,
+    painFlags: (row.painFlags as string[]) ?? [],
+    setCount: setCountBySession.get(row.id) ?? 0,
+  }));
+}
+
+export async function getSessionDetail(sessionId: string): Promise<HistorySessionDetail | null> {
   if (!db) return null;
-  const rows = await db.select({ schedule: programs.schedule }).from(programs).limit(1);
+
+  const rows = await db
+    .select({
+      id: workoutSessions.id,
+      date: workoutSessions.date,
+      status: workoutSessions.status,
+      templateTitle: workoutTemplates.title,
+      templateFocus: workoutTemplates.focus,
+      perceivedEffort: workoutSessions.perceivedEffort,
+      painFlags: workoutSessions.painFlags,
+      swappedExerciseIds: workoutSessions.swappedExerciseIds,
+    })
+    .from(workoutSessions)
+    .leftJoin(workoutTemplates, eq(workoutSessions.workoutTemplateId, workoutTemplates.id))
+    .where(eq(workoutSessions.id, sessionId))
+    .limit(1);
+
+  if (!rows.length) return null;
+  const session = rows[0];
+
+  const sets = await db
+    .select()
+    .from(performedSets)
+    .where(eq(performedSets.workoutSessionId, sessionId))
+    .orderBy(performedSets.setNumber);
+
+  return {
+    id: session.id,
+    date: session.date,
+    status: session.status,
+    templateTitle: session.templateTitle ?? null,
+    templateFocus: session.templateFocus ?? null,
+    perceivedEffort: session.perceivedEffort ?? null,
+    painFlags: (session.painFlags as string[]) ?? [],
+    setCount: sets.length,
+    swappedExerciseIds: (session.swappedExerciseIds as Record<string, string>) ?? {},
+    performedSets: sets.map((s) => ({
+      exerciseId: s.exerciseId,
+      setNumber: s.setNumber,
+      weight: s.weight,
+      reps: s.reps,
+      durationSeconds: s.durationSeconds ?? null,
+    })),
+  };
+}
+
+export async function getProgram(): Promise<{ id: string; schedule: string[] } | null> {
+  if (!db) return null;
+  const rows = await db.select({ id: programs.id, schedule: programs.schedule }).from(programs).limit(1);
   return rows[0] ?? null;
 }
 
