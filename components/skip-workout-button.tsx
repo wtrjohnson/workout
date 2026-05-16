@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-export function SkipWorkoutButton({ today }: { today: string }) {
+export function SkipWorkoutButton({ today, pushedToLabel }: { today: string; pushedToLabel: string | null }) {
   const router = useRouter();
 
   async function handleSkip() {
@@ -20,7 +20,9 @@ export function SkipWorkoutButton({ today }: { today: string }) {
       type="button"
       className="mono-copy mt-3 text-xs text-label underline underline-offset-2"
     >
-      Not going today — move to tomorrow
+      {pushedToLabel
+        ? `Not going today — move to ${pushedToLabel}`
+        : "Not going today — move to tomorrow"}
     </button>
   );
 }

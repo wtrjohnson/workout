@@ -92,7 +92,16 @@ export function getLastSets(exerciseId: string, sessions: WorkoutSession[]): Per
 }
 
 export function suggestProgression(planned: PlannedExercise, sessions: WorkoutSession[]): string {
+  const exercise = exerciseById.get(planned.exerciseId);
   const lastSets = getLastSets(planned.exerciseId, sessions);
+
+  if (exercise?.isTimeBased) {
+    if (lastSets.length === 0) return "Start with 20-30 seconds. Add 5s each session as long as form holds throughout.";
+    const durations = lastSets.map((s) => s.durationSeconds ?? 0).filter(Boolean);
+    const lastDuration = durations.length ? Math.min(...durations) : 30;
+    return `Target ${lastDuration}s or more. Add 5s when you hold solid form the whole time.`;
+  }
+
   if (lastSets.length === 0) {
     return "Start conservative and leave 1-3 reps in reserve.";
   }
@@ -159,8 +168,20 @@ export function buildWorkoutSteps(workout: WorkoutTemplate): WorkoutStep[] {
 }
 
 export function getSuggestedSet(planned: PlannedExercise, setIndex: number, sessions: WorkoutSession[]): SuggestedSet {
+  const exercise = exerciseById.get(planned.exerciseId);
   const lastSets = getLastSets(planned.exerciseId, sessions);
   const matchingSet = lastSets[setIndex] ?? lastSets[lastSets.length - 1];
+
+  if (exercise?.isTimeBased) {
+    const lastDuration = matchingSet?.durationSeconds ?? 30;
+    return {
+      weight: null,
+      reps: 0,
+      reason: matchingSet
+        ? `Last time: ${lastDuration}s. Hold this or add 5s if form was solid throughout.`
+        : "Start with 30 seconds. Add 5s each session as form holds."
+    };
+  }
 
   if (!matchingSet) {
     return {
@@ -222,7 +243,11 @@ export function getExerciseStats(exerciseId: string, sessions: WorkoutSession[])
   const previousSets = matchingSessions[1]?.performedSets.filter((set) => set.exerciseId === exerciseId) ?? [];
   const allSets = matchingSessions.flatMap((session) => session.performedSets.filter((set) => set.exerciseId === exerciseId));
   const bestSet = allSets.length
-    ? [...allSets].sort((a, b) => b.weight * b.reps - a.weight * a.reps)[0]
+    ? [...allSets].sort((a, b) => {
+        const aVal = a.weight === 0 && a.reps === 0 ? (a.durationSeconds ?? 0) : a.weight * a.reps;
+        const bVal = b.weight === 0 && b.reps === 0 ? (b.durationSeconds ?? 0) : b.weight * b.reps;
+        return bVal - aVal;
+      })[0]
     : null;
   const latestVolume = calculateSetVolume(lastSets);
   const previousVolume = previousSets.length ? calculateSetVolume(previousSets) : null;
@@ -387,7 +412,9 @@ export function scoreSession(
     (loggedSets.reduce((sum, logged) => {
       const planned = workout.exercises.find((ex) => ex.exerciseId === logged.exerciseId);
       if (!planned) return sum + 1;
-      const [low, high] = planned.repRange;
+      const [low] = planned.repRange;
+      // Time-based sets (repRange [0,0], durationSeconds logged) always earn full credit
+      if (low === 0) return sum + 1;
       if (logged.reps >= low) return sum + 1;
       return sum + 0.5;
     }, 0) /
@@ -606,5 +633,10 @@ function findImprovedLift(sessions: WorkoutSession[]): string | null {
 }
 
 function calculateSetVolume(sets: PerformedSet[]): number {
-  return sets.reduce((sum, set) => sum + set.weight * set.reps, 0);
+  return sets.reduce((sum, set) => {
+    if (set.weight === 0 && set.reps === 0 && set.durationSeconds) {
+      return sum + set.durationSeconds;
+    }
+    return sum + set.weight * set.reps;
+  }, 0);
 }

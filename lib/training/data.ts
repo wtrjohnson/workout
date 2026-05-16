@@ -397,8 +397,7 @@ export const exercises: Exercise[] = [
     techniqueCues: ["Press lower back into floor throughout.", "Extend opposite arm and leg slowly.", "Exhale as you lower, inhale to reset."],
     alternatives: ["front-plank", "pallof-press"],
     planetFitnessReady: true,
-    difficulty: "beginner",
-    isTimeBased: true
+    difficulty: "beginner"
   }
 ];
 

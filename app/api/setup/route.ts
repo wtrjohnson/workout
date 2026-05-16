@@ -93,7 +93,8 @@ export async function POST(request: NextRequest) {
       technique_cues       JSONB   NOT NULL,
       alternatives         JSONB   NOT NULL,
       planet_fitness_ready BOOLEAN NOT NULL DEFAULT TRUE,
-      difficulty           TEXT    NOT NULL
+      difficulty           TEXT    NOT NULL,
+      is_time_based        BOOLEAN NOT NULL DEFAULT FALSE
     )`,
 
     `CREATE TABLE IF NOT EXISTS programs (
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
 
   // Muscles + exercises
   await db.insert(musclesTable).values(muscles).onConflictDoNothing();
-  const exerciseRows = exercises.map(({ jointStress: _js, ...e }) => e);
+  const exerciseRows = exercises.map(({ jointStress: _js, ...e }) => ({ ...e, isTimeBased: e.isTimeBased ?? false }));
   await db.insert(exercisesTable).values(exerciseRows).onConflictDoNothing();
 
   // User profile
@@ -215,9 +216,9 @@ export async function POST(request: NextRequest) {
         { exerciseId: "lat-pulldown",     targetSets: 3, repRange: [8,  10] as RepRange, intensity: "hard"     },
         { exerciseId: "leg-raise",        targetSets: 3, repRange: [12, 15] as RepRange, intensity: "moderate" },
         { exerciseId: "db-curl",          targetSets: 2, repRange: [12, 15] as RepRange, intensity: "moderate" },
-        { exerciseId: "front-plank",      targetSets: 3, repRange: [1,  1]  as RepRange, intensity: "moderate" },
-        { exerciseId: "side-plank-left",  targetSets: 2, repRange: [1,  1]  as RepRange, intensity: "moderate" },
-        { exerciseId: "side-plank-right", targetSets: 2, repRange: [1,  1]  as RepRange, intensity: "moderate" },
+        { exerciseId: "front-plank",      targetSets: 3, repRange: [0,  0]  as RepRange, intensity: "moderate" },
+        { exerciseId: "side-plank-left",  targetSets: 2, repRange: [0,  0]  as RepRange, intensity: "moderate" },
+        { exerciseId: "side-plank-right", targetSets: 2, repRange: [0,  0]  as RepRange, intensity: "moderate" },
         { exerciseId: "dead-bugs",        targetSets: 3, repRange: [12, 12] as RepRange, intensity: "moderate" },
       ],
     },
@@ -232,9 +233,9 @@ export async function POST(request: NextRequest) {
         { exerciseId: "db-row",           targetSets: 3, repRange: [8,  10] as RepRange, intensity: "hard"     },
         { exerciseId: "db-skull-crusher", targetSets: 3, repRange: [12, 15] as RepRange, intensity: "moderate" },
         { exerciseId: "face-pulls",       targetSets: 2, repRange: [15, 15] as RepRange, intensity: "moderate" },
-        { exerciseId: "front-plank",      targetSets: 3, repRange: [1,  1]  as RepRange, intensity: "moderate" },
-        { exerciseId: "side-plank-left",  targetSets: 2, repRange: [1,  1]  as RepRange, intensity: "moderate" },
-        { exerciseId: "side-plank-right", targetSets: 2, repRange: [1,  1]  as RepRange, intensity: "moderate" },
+        { exerciseId: "front-plank",      targetSets: 3, repRange: [0,  0]  as RepRange, intensity: "moderate" },
+        { exerciseId: "side-plank-left",  targetSets: 2, repRange: [0,  0]  as RepRange, intensity: "moderate" },
+        { exerciseId: "side-plank-right", targetSets: 2, repRange: [0,  0]  as RepRange, intensity: "moderate" },
         { exerciseId: "dead-bugs",        targetSets: 3, repRange: [12, 12] as RepRange, intensity: "moderate" },
       ],
     },

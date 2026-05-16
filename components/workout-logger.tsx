@@ -58,6 +58,16 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   const [restDuration, setRestDuration] = useState(0);
   const [remainingRest, setRemainingRest] = useState(0);
 
+  if (steps.length === 0) {
+    return (
+      <div className="rounded-3xl border border-black/6 bg-white p-5 shadow-card">
+        <p className="text-sm font-medium text-label">Empty template</p>
+        <h1 className="chunky-title mt-1 text-3xl font-black leading-none text-ink">No exercises</h1>
+        <p className="mono-copy mt-3 text-xs leading-5 text-label">This workout template has no exercises configured.</p>
+      </div>
+    );
+  }
+
   const activeStep = steps[activeStepIndex];
   const currentExerciseId = swaps[activeStep.planned.exerciseId] ?? activeStep.planned.exerciseId;
   const currentPlanned = { ...activeStep.planned, exerciseId: currentExerciseId };
@@ -66,7 +76,14 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   const suggested = getSuggestedSet(currentPlanned, activeStep.setIndex, sessions);
   const [weight, setWeight] = useState<number | null>(suggested.weight);
   const [reps, setReps] = useState(suggested.reps);
-  const [duration, setDuration] = useState(30);
+  const [duration, setDuration] = useState(() => {
+    if (!isTimeBased) return 30;
+    const prev = sessions
+      .flatMap((s) => s.performedSets)
+      .filter((s) => s.exerciseId === currentExerciseId && s.durationSeconds)
+      .sort((a, b) => b.date.localeCompare(a.date))[0];
+    return prev?.durationSeconds ?? 30;
+  });
 
   const substitutions = findSubstitutions(currentExerciseId, painFlags);
   const exerciseStats = getExerciseStats(currentExerciseId, sessions);
@@ -77,6 +94,13 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     const nextSuggestion = getSuggestedSet(currentPlanned, activeStep.setIndex, sessions);
     setWeight(nextSuggestion.weight);
     setReps(nextSuggestion.reps);
+    if (currentExercise.isTimeBased) {
+      const prev = sessions
+        .flatMap((s) => s.performedSets)
+        .filter((s) => s.exerciseId === currentExerciseId && s.durationSeconds)
+        .sort((a, b) => b.date.localeCompare(a.date))[0];
+      setDuration(prev?.durationSeconds ?? 30);
+    }
   }, [activeStep.setIndex, currentExerciseId]);
 
   function startRest(seconds: number) {
@@ -611,7 +635,10 @@ function WorkoutScorecard({
   const [effort, setEffort] = useState<PerceivedEffort | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const totalVolume = loggedSets.reduce((sum, set) => sum + (set.weight ?? 0) * set.reps, 0);
+  const totalVolume = loggedSets.reduce((sum, set) => {
+    if (set.weight === 0 && set.reps === 0 && set.durationSeconds) return sum + set.durationSeconds;
+    return sum + (set.weight ?? 0) * set.reps;
+  }, 0);
   const sessionResult = scoreSession(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), workout, sessions);
 
   async function handleFinish() {
@@ -678,9 +705,14 @@ function WorkoutScorecard({
         </p>
       )}
 
+      {loggedSets.length === 0 && (
+        <p className="mono-copy text-center text-xs text-label">
+          No sets logged — log at least one set to save this session.
+        </p>
+      )}
       <button
         type="button"
-        disabled={saving}
+        disabled={saving || loggedSets.length === 0}
         onClick={handleFinish}
         className="flex w-full items-center justify-center rounded-3xl bg-ink py-4 text-lg font-black text-white shadow-card disabled:opacity-40"
       >
