@@ -640,3 +640,72 @@ function calculateSetVolume(sets: PerformedSet[]): number {
     return sum + set.weight * set.reps;
   }, 0);
 }
+
+export type PersonalRecord = {
+  exerciseId: string;
+  exerciseName: string;
+  type: "weight" | "volume" | "duration";
+  value: number;
+  unit: string;
+};
+
+export function detectNewPRs(
+  loggedSets: Array<{ exerciseId: string; weight: number; reps: number; durationSeconds?: number }>,
+  priorSessions: WorkoutSession[]
+): PersonalRecord[] {
+  const prs: PersonalRecord[] = [];
+  const exerciseIds = [...new Set(loggedSets.map((s) => s.exerciseId))];
+
+  for (const exerciseId of exerciseIds) {
+    const exercise = exerciseById.get(exerciseId);
+    if (!exercise) continue;
+
+    const currentSets = loggedSets.filter((s) => s.exerciseId === exerciseId);
+    const priorSets = priorSessions
+      .filter((s) => s.status === "completed")
+      .flatMap((s) => s.performedSets)
+      .filter((s) => s.exerciseId === exerciseId);
+
+    if (priorSets.length === 0) continue;
+
+    if (exercise.isTimeBased) {
+      const currentMax = Math.max(...currentSets.map((s) => s.durationSeconds ?? 0));
+      const priorMax = Math.max(...priorSets.map((s) => s.durationSeconds ?? 0));
+      if (currentMax > priorMax) {
+        prs.push({ exerciseId, exerciseName: exercise.name, type: "duration", value: currentMax, unit: "sec" });
+      }
+    } else {
+      const currentMaxWeight = Math.max(...currentSets.map((s) => s.weight));
+      const priorMaxWeight = Math.max(...priorSets.map((s) => s.weight));
+      if (currentMaxWeight > priorMaxWeight) {
+        prs.push({ exerciseId, exerciseName: exercise.name, type: "weight", value: currentMaxWeight, unit: "lb" });
+      } else {
+        const currentMaxVol = Math.max(...currentSets.map((s) => s.weight * s.reps));
+        const priorMaxVol = Math.max(...priorSets.map((s) => s.weight * s.reps));
+        if (currentMaxVol > priorMaxVol) {
+          prs.push({ exerciseId, exerciseName: exercise.name, type: "volume", value: Math.round(currentMaxVol), unit: "lb·reps" });
+        }
+      }
+    }
+  }
+
+  return prs;
+}
+
+export type BlockStatus = {
+  weekInBlock: number;
+  isDeload: boolean;
+  totalCompletedSessions: number;
+};
+
+export function getBlockStatus(sessions: WorkoutSession[]): BlockStatus {
+  const completed = sessions.filter((s) => s.status === "completed").length;
+  // 4-week accumulation + 1-week deload = 5-week block
+  // Approximate: ~3 sessions/week × 5 weeks = 15 sessions per block
+  const SESSIONS_PER_BLOCK = 15;
+  const SESSIONS_PER_WEEK = 3;
+  const positionInBlock = completed % SESSIONS_PER_BLOCK;
+  const weekInBlock = Math.floor(positionInBlock / SESSIONS_PER_WEEK) + 1;
+  const isDeload = weekInBlock === 5;
+  return { weekInBlock: Math.min(weekInBlock, 5), isDeload, totalCompletedSessions: completed };
+}

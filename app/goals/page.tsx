@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
@@ -28,6 +28,7 @@ export default function GoalsPage() {
   const [days, setDays] = useState(3);
   const [equipment, setEquipment] = useState<string[]>(["smith_machine", "dumbbell", "machine", "cable", "bodyweight"]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [genState, setGenState] = useState<"idle" | "generating" | "done" | "error">("idle");
 
   useEffect(() => {
     fetch("/api/profile")
@@ -47,6 +48,17 @@ export default function GoalsPage() {
     setEquipment((current: string[]) =>
       current.includes(value) ? current.filter((item: string) => item !== value) : [...current, value]
     );
+  }
+
+  async function handleGenerateProgram() {
+    setGenState("generating");
+    try {
+      const r = await fetch("/api/ai/generate-program", { method: "POST" });
+      setGenState(r.ok ? "done" : "error");
+      if (r.ok) setTimeout(() => setGenState("idle"), 3000);
+    } catch {
+      setGenState("error");
+    }
   }
 
   async function handleSave() {
@@ -134,6 +146,27 @@ export default function GoalsPage() {
         className="tap-target w-full rounded-full bg-[#2563eb] px-4 py-4 font-bold text-white shadow-card transition active:scale-[0.98] disabled:opacity-50"
       >
         {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : saveState === "error" ? "Save failed — try again" : "Save setup"}
+      </button>
+
+      <button
+        type="button"
+        onClick={handleGenerateProgram}
+        disabled={genState === "generating"}
+        className="tap-target flex w-full items-center justify-between rounded-2xl border border-[#7c3aed]/20 bg-[#f5f3ff] px-4 py-4 transition active:scale-[0.98] disabled:opacity-50"
+      >
+        <div className="text-left">
+          <p className="text-sm font-bold text-[#5b21b6]">
+            {genState === "generating" ? "Building your program…" :
+             genState === "done" ? "Program updated ✓" :
+             genState === "error" ? "Generation failed — try again" :
+             "AI program generator"}
+          </p>
+          <p className="mt-0.5 text-xs text-[#7c3aed]/70">
+            {genState === "generating" ? "Claude is selecting your exercises" :
+             "Rebuild your workout templates to match your current goals"}
+          </p>
+        </div>
+        <Sparkles className="ml-3 size-5 shrink-0 text-[#7c3aed]" aria-hidden />
       </button>
 
       <Link

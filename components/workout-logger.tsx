@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
 import {
   buildWorkoutSteps,
+  detectNewPRs,
   findSubstitutions,
   getExerciseStats,
   getExercise,
@@ -15,7 +16,7 @@ import {
   getSuggestedSet,
   scoreSession
 } from "@/lib/training/logic";
-import type { WorkoutStep } from "@/lib/training/logic";
+import type { PersonalRecord, WorkoutStep } from "@/lib/training/logic";
 import type { PerceivedEffort, WorkoutSession, WorkoutTemplate } from "@/lib/training/types";
 
 type LoggedSet = {
@@ -103,11 +104,18 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     }
   }, [activeStep.setIndex, currentExerciseId]);
 
-  function startRest(seconds: number) {
+  function startRest(seconds: number, nextExerciseName?: string) {
     const dur = Math.max(1, seconds);
     setRestDuration(dur);
     setRemainingRest(dur);
     setRestEndTime(Date.now() + dur * 1000);
+
+    // Ask service worker to schedule a notification for when rest ends
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then((sw) => {
+        sw.active?.postMessage({ type: "SCHEDULE_REST_NOTIFICATION", seconds: dur, nextExercise: nextExerciseName });
+      }).catch(() => null);
+    }
   }
 
   function goToNextStep() {
@@ -175,7 +183,8 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
       return;
     }
 
-    startRest(getRestSeconds(currentPlanned, isTimeBased ? undefined : reps));
+    const nextExName = nextStep ? getExercise(swaps[nextStep.planned.exerciseId] ?? nextStep.planned.exerciseId).name : undefined;
+    startRest(getRestSeconds(currentPlanned, isTimeBased ? undefined : reps), nextExName);
     setMode("resting");
   }
 
@@ -211,6 +220,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
         workout={workout}
         sessions={sessions}
         painFlags={painFlags}
+        swaps={swaps}
       />
     );
   }
@@ -624,12 +634,14 @@ function WorkoutScorecard({
   workout,
   sessions,
   painFlags,
+  swaps,
 }: {
   loggedSets: LoggedSet[];
   totalSets: number;
   workout: WorkoutTemplate;
   sessions: WorkoutSession[];
   painFlags: string[];
+  swaps: Record<string, string>;
 }) {
   const router = useRouter();
   const [effort, setEffort] = useState<PerceivedEffort | null>(null);
@@ -640,6 +652,7 @@ function WorkoutScorecard({
     return sum + (set.weight ?? 0) * set.reps;
   }, 0);
   const sessionResult = scoreSession(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), workout, sessions);
+  const newPRs = detectNewPRs(loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })), sessions);
 
   async function handleFinish() {
     setSaving(true);
@@ -652,6 +665,7 @@ function WorkoutScorecard({
           sets: loggedSets.map((s) => ({ ...s, weight: s.weight ?? 0 })),
           painFlags,
           effort,
+          swappedExerciseIds: swaps,
         }),
       });
       if (r.ok) {
@@ -678,6 +692,22 @@ function WorkoutScorecard({
         </div>
         <p className="mono-copy mt-3 text-xs leading-5 text-[#2563eb]/80">{sessionResult.context}</p>
       </div>
+
+      {newPRs.length > 0 && (
+        <div className="rounded-3xl border border-[#f59e0b]/20 bg-[#fffbeb] p-5">
+          <p className="text-sm font-bold text-[#92400e]">Personal records</p>
+          <div className="mt-3 space-y-2">
+            {newPRs.map((pr) => (
+              <div key={`${pr.exerciseId}-${pr.type}`} className="flex items-center justify-between">
+                <p className="text-sm font-medium text-ink">{pr.exerciseName}</p>
+                <span className="rounded-full bg-[#f59e0b] px-2 py-0.5 text-xs font-black text-white">
+                  {pr.type === "weight" ? `${pr.value} lb` : pr.type === "duration" ? `${pr.value}s` : `${pr.value} vol`} PR
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-3xl border border-black/6 bg-white p-5 shadow-card">
         <p className="text-sm font-bold text-ink">How did that feel?</p>

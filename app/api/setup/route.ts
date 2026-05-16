@@ -117,14 +117,16 @@ export async function POST(request: NextRequest) {
     )`,
 
     `CREATE TABLE IF NOT EXISTS workout_sessions (
-      id                  UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_profile_id     UUID           NOT NULL REFERENCES user_profiles(id),
-      workout_template_id UUID           REFERENCES workout_templates(id),
-      date                TIMESTAMP      NOT NULL DEFAULT NOW(),
-      status              workout_status NOT NULL DEFAULT 'planned',
-      duration_minutes    INTEGER,
-      notes               TEXT,
-      pain_flags          JSONB          NOT NULL DEFAULT '[]'
+      id                    UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_profile_id       UUID           NOT NULL REFERENCES user_profiles(id),
+      workout_template_id   UUID           REFERENCES workout_templates(id),
+      date                  TIMESTAMP      NOT NULL DEFAULT NOW(),
+      status                workout_status NOT NULL DEFAULT 'planned',
+      duration_minutes      INTEGER,
+      notes                 TEXT,
+      pain_flags            JSONB          NOT NULL DEFAULT '[]',
+      perceived_effort      TEXT,
+      swapped_exercise_ids  JSONB          NOT NULL DEFAULT '{}'
     )`,
 
     `CREATE TABLE IF NOT EXISTS performed_sets (
@@ -161,6 +163,16 @@ export async function POST(request: NextRequest) {
 
   for (const stmt of schemaStatements) {
     await sqlClient.query(stmt);
+  }
+
+  // Migrations for existing DBs
+  const migrations = [
+    `ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS perceived_effort TEXT`,
+    `ALTER TABLE workout_sessions ADD COLUMN IF NOT EXISTS swapped_exercise_ids JSONB NOT NULL DEFAULT '{}'`,
+    `ALTER TABLE exercises ADD COLUMN IF NOT EXISTS is_time_based BOOLEAN NOT NULL DEFAULT FALSE`,
+  ];
+  for (const stmt of migrations) {
+    await sqlClient.query(stmt).catch(() => null);
   }
 
   // ── Seed data ────────────────────────────────────────────────────────────
