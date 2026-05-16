@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { WorkoutLogger } from "@/components/workout-logger";
 import { getSessionsWithSets, getTemplates } from "@/lib/db/queries";
 import { getNextTemplate } from "@/lib/training/logic";

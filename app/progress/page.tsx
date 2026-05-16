@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { AppShell } from "@/components/app-shell";
 import { DarkChartCard } from "@/components/dark-chart-card";
 import { MetricRing } from "@/components/metric-ring";
