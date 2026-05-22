@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BottomNav } from "@/components/bottom-nav";
+import { SessionSetsEditor } from "@/components/session-sets-editor";
 import { getSessionDetail } from "@/lib/db/queries";
 import { exercises } from "@/lib/training/data";
 
@@ -39,6 +40,19 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
     if (s.weight === 0 && s.reps === 0 && s.durationSeconds) return sum + s.durationSeconds;
     return sum + s.weight * s.reps;
   }, 0);
+
+  const exerciseGroups = exerciseIds.map((exId) => {
+    const exercise = exerciseById.get(exId);
+    const sets = session.performedSets.filter((s) => s.exerciseId === exId);
+    const swappedFrom = Object.entries(session.swappedExerciseIds).find(([, to]) => to === exId)?.[0];
+    return {
+      exerciseId: exId,
+      exerciseName: exercise?.name ?? exId,
+      isTimeBased: exercise?.isTimeBased ?? false,
+      originalName: swappedFrom ? exerciseById.get(swappedFrom)?.name ?? null : null,
+      sets,
+    };
+  });
 
   return (
     <main className="safe-bottom mx-auto min-h-screen w-full max-w-md bg-surface px-4 pb-28 pt-6 text-ink">
@@ -83,43 +97,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
-      <section className="space-y-3">
-        {exerciseIds.map((exId) => {
-          const exercise = exerciseById.get(exId);
-          const sets = session.performedSets.filter((s) => s.exerciseId === exId);
-          const isTimeBased = exercise?.isTimeBased ?? false;
-          const swappedFrom = Object.entries(session.swappedExerciseIds).find(([, to]) => to === exId)?.[0];
-          const originalName = swappedFrom ? exerciseById.get(swappedFrom)?.name : null;
-
-          return (
-            <article key={exId} className="rounded-2xl border border-black/6 bg-white p-4 shadow-card">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h2 className="text-sm font-bold text-ink">{exercise?.name ?? exId}</h2>
-                  {originalName && (
-                    <p className="mt-0.5 text-xs text-label">swap from {originalName}</p>
-                  )}
-                </div>
-                <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-label">
-                  {sets.length} {sets.length === 1 ? "set" : "sets"}
-                </span>
-              </div>
-              <div className="mt-3 space-y-1">
-                {sets.map((set) => (
-                  <div key={set.setNumber} className="flex items-center gap-2 text-sm">
-                    <span className="mono-copy w-5 text-xs text-label">{set.setNumber}</span>
-                    <span className="font-medium text-ink">
-                      {isTimeBased && set.durationSeconds
-                        ? `${set.durationSeconds}s`
-                        : `${set.weight} lb × ${set.reps}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </article>
-          );
-        })}
-      </section>
+      <SessionSetsEditor sessionId={id} exerciseGroups={exerciseGroups} />
 
       <BottomNav />
     </main>

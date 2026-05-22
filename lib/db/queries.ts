@@ -55,6 +55,7 @@ export type HistorySession = {
 
 export type HistorySessionDetail = HistorySession & {
   performedSets: Array<{
+    id: string;
     exerciseId: string;
     setNumber: number;
     weight: number;
@@ -140,6 +141,7 @@ export async function getSessionDetail(sessionId: string): Promise<HistorySessio
     setCount: sets.length,
     swappedExerciseIds: (session.swappedExerciseIds as Record<string, string>) ?? {},
     performedSets: sets.map((s) => ({
+      id: s.id,
       exerciseId: s.exerciseId,
       setNumber: s.setNumber,
       weight: s.weight,

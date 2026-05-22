@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Repeat2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Clock, List, Repeat2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -30,9 +30,11 @@ type LoggedSet = {
 type MutableStep = WorkoutStep & { skippedOnce: boolean };
 
 type WorkoutMode = "active" | "resting" | "complete";
-type ActivePanel = "history" | "info" | null;
+type ActivePanel = "history" | "info" | "reorder" | null;
 
 const painOptions = ["shoulder", "knee", "lower_back"] as const;
+const DRAFT_KEY = "workout_draft";
+const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const EFFORT_OPTIONS: Array<{ value: PerceivedEffort; label: string }> = [
   { value: "easy", label: "Easy" },
@@ -42,15 +44,57 @@ const EFFORT_OPTIONS: Array<{ value: PerceivedEffort; label: string }> = [
   { value: "very_hard", label: "Wrecked" }
 ];
 
+type WorkoutDraft = {
+  templateId: string;
+  savedAt: number;
+  loggedSets: LoggedSet[];
+  activeStepIndex: number;
+  steps: MutableStep[];
+  swaps: Record<string, string>;
+  painFlags: string[];
+};
+
+function loadDraft(templateId: string): WorkoutDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as WorkoutDraft;
+    if (draft.templateId !== templateId) return null;
+    if (Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) return null;
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
 export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate; sessions: WorkoutSession[] }) {
-  const [steps, setSteps] = useState<MutableStep[]>(() =>
-    buildWorkoutSteps(workout).map((step) => ({ ...step, skippedOnce: false }))
-  );
+  const defaultSteps = () =>
+    buildWorkoutSteps(workout).map((step) => ({ ...step, skippedOnce: false }));
+
+  const [resumedFromDraft, setResumedFromDraft] = useState(false);
+  const [steps, setSteps] = useState<MutableStep[]>(() => {
+    if (typeof window === "undefined") return defaultSteps();
+    const draft = loadDraft(workout.id);
+    if (draft) { setResumedFromDraft(true); return draft.steps; }
+    return defaultSteps();
+  });
   const [mode, setMode] = useState<WorkoutMode>("active");
-  const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const [painFlags, setPainFlags] = useState<string[]>([]);
-  const [swaps, setSwaps] = useState<Record<string, string>>({});
-  const [loggedSets, setLoggedSets] = useState<LoggedSet[]>([]);
+  const [activeStepIndex, setActiveStepIndex] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    return loadDraft(workout.id)?.activeStepIndex ?? 0;
+  });
+  const [painFlags, setPainFlags] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    return loadDraft(workout.id)?.painFlags ?? [];
+  });
+  const [swaps, setSwaps] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    return loadDraft(workout.id)?.swaps ?? {};
+  });
+  const [loggedSets, setLoggedSets] = useState<LoggedSet[]>(() => {
+    if (typeof window === "undefined") return [];
+    return loadDraft(workout.id)?.loggedSets ?? [];
+  });
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [setFeedback, setSetFeedback] = useState<import("@/lib/training/logic").SetFeedback | null>(null);
 
@@ -58,6 +102,11 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   const [restEndTime, setRestEndTime] = useState<number | null>(null);
   const [restDuration, setRestDuration] = useState(0);
   const [remainingRest, setRemainingRest] = useState(0);
+
+  // Timed exercise live timer
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
+  const [timerElapsed, setTimerElapsed] = useState(0);
 
   if (steps.length === 0) {
     return (
@@ -91,6 +140,25 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   const nextStep = steps[activeStepIndex + 1];
   const progress = Math.round((loggedSets.length / steps.length) * 100);
 
+  // Save draft whenever key state changes
+  useEffect(() => {
+    if (mode === "complete") return;
+    try {
+      const draft: WorkoutDraft = {
+        templateId: workout.id,
+        savedAt: Date.now(),
+        loggedSets,
+        activeStepIndex,
+        steps,
+        swaps,
+        painFlags,
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // localStorage may be unavailable
+    }
+  }, [loggedSets, activeStepIndex, steps, swaps, painFlags, mode]);
+
   useEffect(() => {
     const nextSuggestion = getSuggestedSet(currentPlanned, activeStep.setIndex, sessions);
     setWeight(nextSuggestion.weight);
@@ -102,7 +170,34 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
         .sort((a, b) => b.date.localeCompare(a.date))[0];
       setDuration(prev?.durationSeconds ?? 30);
     }
+    // Reset timer when exercise changes
+    setTimerActive(false);
+    setTimerStartTime(null);
+    setTimerElapsed(0);
   }, [activeStep.setIndex, currentExerciseId]);
+
+  // Live timer tick (for timed exercises)
+  useEffect(() => {
+    if (!timerActive || timerStartTime === null) return;
+    function tick() {
+      setTimerElapsed(Math.round((Date.now() - timerStartTime!) / 1000));
+    }
+    tick();
+    const id = window.setInterval(tick, 500);
+    return () => window.clearInterval(id);
+  }, [timerActive, timerStartTime]);
+
+  // Sync live timer when returning from background
+  useEffect(() => {
+    if (!timerActive || timerStartTime === null) return;
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        setTimerElapsed(Math.round((Date.now() - timerStartTime!) / 1000));
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [timerActive, timerStartTime]);
 
   function startRest(seconds: number, nextExerciseName?: string) {
     const dur = Math.max(1, seconds);
@@ -110,7 +205,6 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     setRemainingRest(dur);
     setRestEndTime(Date.now() + dur * 1000);
 
-    // Ask service worker to schedule a notification for when rest ends
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.ready.then((sw) => {
         sw.active?.postMessage({ type: "SCHEDULE_REST_NOTIFICATION", seconds: dur, nextExercise: nextExerciseName });
@@ -128,7 +222,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     setMode("active");
   }
 
-  // Anchored interval: recalculates from wall clock on each tick
+  // Anchored rest interval
   useEffect(() => {
     if (mode !== "resting" || restEndTime === null) return;
 
@@ -143,7 +237,6 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     return () => window.clearInterval(timer);
   }, [mode, restEndTime]);
 
-  // Sync timer when app returns from background
   useEffect(() => {
     if (mode !== "resting" || restEndTime === null) return;
 
@@ -159,9 +252,10 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [mode, restEndTime]);
 
-  function completeSet() {
+  function completeSet(overrideDuration?: number) {
+    const actualDuration = overrideDuration ?? duration;
     const completedSet: LoggedSet = isTimeBased
-      ? { exerciseId: currentExerciseId, setNumber: activeStep.setIndex + 1, weight: 0, reps: 0, durationSeconds: duration }
+      ? { exerciseId: currentExerciseId, setNumber: activeStep.setIndex + 1, weight: 0, reps: 0, durationSeconds: actualDuration }
       : { exerciseId: currentExerciseId, setNumber: activeStep.setIndex + 1, weight, reps };
 
     if (!isTimeBased) {
@@ -176,6 +270,9 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
       setSetFeedback(null);
     }
 
+    setTimerActive(false);
+    setTimerStartTime(null);
+    setTimerElapsed(0);
     setLoggedSets((current) => [...current, completedSet]);
 
     if (activeStepIndex >= steps.length - 1) {
@@ -200,7 +297,36 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
         .filter((s) => s.planned.exerciseId !== exId || s.skippedOnce);
       return [...current.slice(0, activeStepIndex), ...remaining, ...toDefer];
     });
-    // activeStepIndex stays the same — next exercise now slides into that position
+  }
+
+  function reorderExercise(exerciseId: string, direction: "up" | "down") {
+    setSteps((current) => {
+      const before = current.slice(0, activeStepIndex);
+      const remaining = current.slice(activeStepIndex);
+
+      // Build ordered list of unique exercise IDs and their step groups
+      const exerciseOrder: string[] = [];
+      const exerciseGroups = new Map<string, MutableStep[]>();
+      for (const step of remaining) {
+        const exId = step.planned.exerciseId;
+        if (!exerciseGroups.has(exId)) {
+          exerciseOrder.push(exId);
+          exerciseGroups.set(exId, []);
+        }
+        exerciseGroups.get(exId)!.push(step);
+      }
+
+      const idx = exerciseOrder.indexOf(exerciseId);
+      if (direction === "up" && idx > 1) {
+        // idx 0 is the current exercise being logged — can't move before it
+        [exerciseOrder[idx - 1], exerciseOrder[idx]] = [exerciseOrder[idx], exerciseOrder[idx - 1]];
+      } else if (direction === "down" && idx < exerciseOrder.length - 1 && idx !== 0) {
+        [exerciseOrder[idx], exerciseOrder[idx + 1]] = [exerciseOrder[idx + 1], exerciseOrder[idx]];
+      }
+
+      const reordered = exerciseOrder.flatMap((id) => exerciseGroups.get(id)!);
+      return [...before, ...reordered];
+    });
   }
 
   function togglePain(flag: string) {
@@ -210,6 +336,17 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   function swapExercise(nextExerciseId: string) {
     setSwaps((current) => ({ ...current, [activeStep.planned.exerciseId]: nextExerciseId }));
     setActivePanel(null);
+  }
+
+  function startFresh() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    setSteps(defaultSteps());
+    setActiveStepIndex(0);
+    setLoggedSets([]);
+    setSwaps({});
+    setPainFlags([]);
+    setMode("active");
+    setResumedFromDraft(false);
   }
 
   if (mode === "complete") {
@@ -248,8 +385,40 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     );
   }
 
+  // Build remaining exercise list for reorder panel
+  const remainingExercises = (() => {
+    const seen = new Set<string>();
+    const result: Array<{ exerciseId: string; name: string; isCurrent: boolean }> = [];
+    for (const step of steps.slice(activeStepIndex)) {
+      const exId = step.planned.exerciseId;
+      if (!seen.has(exId)) {
+        seen.add(exId);
+        const resolvedId = swaps[exId] ?? exId;
+        result.push({
+          exerciseId: exId,
+          name: getExercise(resolvedId).name,
+          isCurrent: exId === activeStep.planned.exerciseId,
+        });
+      }
+    }
+    return result;
+  })();
+
   return (
     <>
+      {resumedFromDraft && (
+        <div className="mb-2 flex items-center justify-between rounded-2xl border border-[#2563eb]/20 bg-[#e8eeff] px-4 py-2">
+          <p className="mono-copy text-xs text-[#2563eb]">Resumed from where you left off</p>
+          <button
+            type="button"
+            onClick={startFresh}
+            className="mono-copy text-xs font-semibold text-[#2563eb] underline"
+          >
+            Start fresh
+          </button>
+        </div>
+      )}
+
       <ProgressStrip
         completedSets={loggedSets.length}
         totalSets={steps.length}
@@ -274,42 +443,66 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
         </p>
       </section>
 
-      <section className="rounded-3xl bg-[#2563eb] px-5 py-7">
-        {isTimeBased ? (
-          <div className="flex justify-center">
-            <StepperValue
-              label="Duration"
-              value={duration}
-              unit="sec"
-              step={5}
-              min={5}
-              onChange={(value) => setDuration(value ?? 5)}
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            <StepperValue
-              label="Weight"
-              value={weight}
-              unit="lbs"
-              step={5}
-              min={0}
-              onChange={setWeight}
-            />
-            <StepperValue label="Reps" value={reps} unit="reps" step={1} min={1} onChange={(value) => setReps(value ?? 1)} />
-          </div>
-        )}
-      </section>
+      {/* Timed exercise: show live timer or duration stepper */}
+      {isTimeBased && timerActive ? (
+        <ExerciseTimer
+          elapsed={timerElapsed}
+          target={duration}
+          onLog={() => completeSet(timerElapsed)}
+        />
+      ) : (
+        <section className="rounded-3xl bg-[#2563eb] px-5 py-7">
+          {isTimeBased ? (
+            <div className="flex justify-center">
+              <StepperValue
+                label="Duration"
+                value={duration}
+                unit="sec"
+                step={5}
+                min={5}
+                onChange={(value) => setDuration(value ?? 5)}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <StepperValue
+                label="Weight"
+                value={weight}
+                unit="lbs"
+                step={5}
+                min={0}
+                onChange={setWeight}
+              />
+              <StepperValue label="Reps" value={reps} unit="reps" step={1} min={1} onChange={(value) => setReps(value ?? 1)} />
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="flex items-center gap-3">
-        <button
-          className="tap-target flex-1 rounded-3xl bg-ink px-5 py-4 text-3xl font-black leading-none text-white shadow-card"
-          onClick={completeSet}
-          type="button"
-        >
-          Log set
-        </button>
-        {!activeStep.skippedOnce && (
+        {isTimeBased && !timerActive ? (
+          <button
+            className="tap-target flex-1 rounded-3xl bg-[#2563eb] px-5 py-4 text-3xl font-black leading-none text-white shadow-card"
+            onClick={() => {
+              setTimerStartTime(Date.now());
+              setTimerElapsed(0);
+              setTimerActive(true);
+            }}
+            type="button"
+          >
+            Start
+          </button>
+        ) : !timerActive ? (
+          <button
+            className="tap-target flex-1 rounded-3xl bg-ink px-5 py-4 text-3xl font-black leading-none text-white shadow-card"
+            onClick={() => completeSet()}
+            type="button"
+          >
+            Log set
+          </button>
+        ) : null}
+
+        {!activeStep.skippedOnce && !timerActive && (
           <button
             className="tap-target rounded-3xl border border-black/8 bg-white px-4 py-4 text-sm font-black leading-none text-ink shadow-card"
             onClick={skipExercise}
@@ -326,12 +519,32 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
         >
           <Clock className="size-6" aria-hidden />
         </button>
+        <button
+          className="grid size-16 place-items-center rounded-full border border-black/8 bg-white text-ink shadow-card"
+          onClick={() => setActivePanel("reorder")}
+          type="button"
+          aria-label="Reorder exercises"
+        >
+          <List className="size-6" aria-hidden />
+        </button>
       </div>
 
       {activePanel ? (
-        <PanelOverlay title={activePanel === "history" ? "Exercise history" : "Exercise info"} onClose={() => setActivePanel(null)}>
+        <PanelOverlay
+          title={
+            activePanel === "history" ? "Exercise history" :
+            activePanel === "reorder" ? "Exercise order" :
+            "Exercise info"
+          }
+          onClose={() => setActivePanel(null)}
+        >
           {activePanel === "history" ? (
             <ExerciseStatsPanel stats={exerciseStats} suggestion={suggested.reason} isTimeBased={isTimeBased} />
+          ) : activePanel === "reorder" ? (
+            <ReorderPanel
+              exercises={remainingExercises}
+              onMove={reorderExercise}
+            />
           ) : (
             <ExerciseInfoPanel
               cues={currentExercise.techniqueCues}
@@ -344,6 +557,133 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
         </PanelOverlay>
       ) : null}
     </>
+  );
+}
+
+function ExerciseTimer({
+  elapsed,
+  target,
+  onLog,
+}: {
+  elapsed: number;
+  target: number;
+  onLog: () => void;
+}) {
+  const isPastTarget = elapsed >= target;
+  const displaySeconds = isPastTarget ? elapsed - target : target - elapsed;
+  const progress = isPastTarget ? 1 : elapsed / target;
+  const overProgress = isPastTarget ? Math.min(1, (elapsed - target) / target) : 0;
+
+  return (
+    <section className="flex flex-col items-center rounded-3xl bg-[#2563eb] px-5 py-7">
+      <div className="relative grid size-52 place-items-center rounded-full">
+        <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden>
+          <circle cx="50" cy="50" r="43" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="6" />
+          {isPastTarget ? (
+            <circle
+              cx="50" cy="50" r="43"
+              fill="none"
+              stroke="rgba(255,255,255,0.9)"
+              strokeDasharray="270"
+              strokeDashoffset={270 - 270 * overProgress}
+              strokeLinecap="round"
+              strokeWidth="6"
+            />
+          ) : (
+            <circle
+              cx="50" cy="50" r="43"
+              fill="none"
+              stroke="white"
+              strokeDasharray="270"
+              strokeDashoffset={270 * (1 - progress)}
+              strokeLinecap="round"
+              strokeWidth="6"
+            />
+          )}
+        </svg>
+        <div className="text-center">
+          {isPastTarget && (
+            <p className="mono-copy text-xs font-semibold text-white/70">+{formatSeconds(elapsed - target)}</p>
+          )}
+          <p className="mono-copy text-5xl font-black leading-none text-white">
+            {formatSeconds(displaySeconds)}
+          </p>
+          {isPastTarget ? (
+            <p className="mono-copy mt-1 text-xs text-white/80">past goal</p>
+          ) : (
+            <p className="mono-copy mt-1 text-xs text-white/60">remaining</p>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onLog}
+        className={`tap-target mt-6 w-full rounded-3xl px-5 py-4 text-2xl font-black leading-none shadow-card ${
+          isPastTarget
+            ? "bg-white text-[#2563eb]"
+            : "bg-white/20 text-white"
+        }`}
+      >
+        {isPastTarget ? `Log ${elapsed}s` : "Stop & log"}
+      </button>
+    </section>
+  );
+}
+
+function ReorderPanel({
+  exercises,
+  onMove,
+}: {
+  exercises: Array<{ exerciseId: string; name: string; isCurrent: boolean }>;
+  onMove: (exerciseId: string, direction: "up" | "down") => void;
+}) {
+  return (
+    <div>
+      <p className="mono-copy mb-3 text-xs leading-5 text-label">
+        Drag exercises to match equipment availability. The current exercise cannot be moved.
+      </p>
+      <div className="space-y-2">
+        {exercises.map((ex, idx) => (
+          <div
+            key={ex.exerciseId}
+            className={`flex items-center gap-3 rounded-2xl border px-3 py-3 ${
+              ex.isCurrent
+                ? "border-[#2563eb]/20 bg-[#e8eeff]"
+                : "border-black/6 bg-surface"
+            }`}
+          >
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                disabled={ex.isCurrent || idx <= 1}
+                onClick={() => onMove(ex.exerciseId, "up")}
+                className="grid size-6 place-items-center rounded text-ink disabled:opacity-20"
+                aria-label="Move up"
+              >
+                <ArrowUp className="size-4" />
+              </button>
+              <button
+                type="button"
+                disabled={ex.isCurrent || idx === exercises.length - 1}
+                onClick={() => onMove(ex.exerciseId, "down")}
+                className="grid size-6 place-items-center rounded text-ink disabled:opacity-20"
+                aria-label="Move down"
+              >
+                <ArrowDown className="size-4" />
+              </button>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`text-sm font-semibold ${ex.isCurrent ? "text-[#2563eb]" : "text-ink"}`}>
+                {ex.name}
+              </p>
+              {ex.isCurrent && (
+                <p className="mono-copy text-xs text-[#2563eb]/70">current</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -669,6 +1009,7 @@ function WorkoutScorecard({
         }),
       });
       if (r.ok) {
+        try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
         router.push("/");
       } else {
         setSaveError(true);
