@@ -7,13 +7,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
 
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set("workout_skipped", date, {
+  const d = new Date(date + "T12:00:00");
+  d.setDate(d.getDate() + 1);
+  const tomorrow = d.toLocaleDateString("en-CA"); // YYYY-MM-DD
+
+  const cookieOptions = {
     httpOnly: false,
     maxAge: 60 * 60 * 48,
     path: "/",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
-  });
+  };
+
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set("workout_skipped", date, cookieOptions);
+  response.cookies.set("workout_pushed_to", tomorrow, cookieOptions);
   return response;
 }

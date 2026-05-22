@@ -54,7 +54,8 @@ export const exercises = pgTable("exercises", {
   techniqueCues: jsonb("technique_cues").$type<string[]>().notNull(),
   alternatives: jsonb("alternatives").$type<string[]>().notNull(),
   planetFitnessReady: boolean("planet_fitness_ready").notNull().default(true),
-  difficulty: text("difficulty").notNull()
+  difficulty: text("difficulty").notNull(),
+  isTimeBased: boolean("is_time_based").notNull().default(false)
 });
 
 export const programs = pgTable("programs", {
@@ -87,7 +88,8 @@ export const workoutSessions = pgTable("workout_sessions", {
   durationMinutes: integer("duration_minutes"),
   notes: text("notes"),
   painFlags: jsonb("pain_flags").$type<string[]>().notNull().default([]),
-  perceivedEffort: text("perceived_effort")
+  perceivedEffort: text("perceived_effort"),
+  swappedExerciseIds: jsonb("swapped_exercise_ids").$type<Record<string, string>>().notNull().default({})
 });
 
 export const performedSets = pgTable("performed_sets", {
