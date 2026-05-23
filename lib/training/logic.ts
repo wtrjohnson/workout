@@ -365,17 +365,26 @@ export type SetFeedback = {
 export function getSetFeedback(
   loggedReps: number,
   planned: PlannedExercise,
-  sessionExerciseSets: Array<{ reps: number }>,
-  priorSets: PerformedSet[]
+  sessionExerciseSets: Array<{ reps: number; weight: number }>,
+  priorSets: PerformedSet[],
+  currentWeight = 0
 ): SetFeedback {
   const [low, high] = planned.repRange;
-  const prevSessionReps = sessionExerciseSets[sessionExerciseSets.length - 1]?.reps;
+  const prevSet = sessionExerciseSets[sessionExerciseSets.length - 1];
   const bestPrior = priorSets.length
     ? Math.max(...priorSets.map((s) => s.weight * s.reps))
     : null;
 
-  if (prevSessionReps !== undefined && loggedReps <= prevSessionReps - 2) {
-    return { message: "Notable drop from last set — take the full rest.", tone: "caution" };
+  if (prevSet !== undefined && loggedReps <= prevSet.reps - 2) {
+    if (currentWeight > prevSet.weight) {
+      // Weight went up — only caution if volume also dropped noticeably
+      if (currentWeight * loggedReps < prevSet.weight * prevSet.reps * 0.9) {
+        return { message: "Weight up, reps down — take the full rest.", tone: "caution" };
+      }
+      // Volume held; fall through to normal feedback
+    } else {
+      return { message: "Notable drop from last set — take the full rest.", tone: "caution" };
+    }
   }
   if (loggedReps < low) {
     return { message: "Short of target. Hold this weight and rebuild the range.", tone: "caution" };

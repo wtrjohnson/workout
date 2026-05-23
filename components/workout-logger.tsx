@@ -265,7 +265,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
       const priorSets = sessions
         .flatMap((s) => s.performedSets)
         .filter((s) => s.exerciseId === currentExerciseId);
-      setSetFeedback(getSetFeedback(reps, currentPlanned, sessionExerciseSets, priorSets));
+      setSetFeedback(getSetFeedback(reps, currentPlanned, sessionExerciseSets, priorSets, weight ?? 0));
     } else {
       setSetFeedback(null);
     }
