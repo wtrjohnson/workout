@@ -122,3 +122,12 @@ export const insights = pgTable("insights", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   dismissedAt: timestamp("dismissed_at")
 });
+
+export const coachMessages = pgTable("coach_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userProfileId: uuid("user_profile_id").notNull().references(() => userProfiles.id),
+  role: text("role").notNull(),
+  body: text("body").notNull(),
+  contextKind: text("context_kind"),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+});

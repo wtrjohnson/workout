@@ -133,3 +133,30 @@ export type Insight = {
   title: string;
   message: string;
 };
+
+export type CoachBubbleKind =
+  | "rest_day"
+  | "training_cta"
+  | "training_cta_optional"
+  | "pr_progress"
+  | "plateau"
+  | "deload"
+  | "streak_risk"
+  | "balance"
+  | "encouragement";
+
+import type { Route } from "next";
+
+export type CoachBubble = {
+  id: string;
+  kind: CoachBubbleKind;
+  body: string;
+  cta?: { label: string; href: Route };
+};
+
+export type CoachReply = {
+  id: string;
+  body: string;
+  contextKind: string | null;
+  createdAt: string;
+};
