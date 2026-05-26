@@ -1,5 +1,6 @@
 import { exercises, muscles, workoutTemplates } from "./data";
 import type {
+  CoachBubble,
   Exercise,
   Insight,
   MuscleId,
@@ -717,4 +718,189 @@ export function getBlockStatus(sessions: WorkoutSession[]): BlockStatus {
   const weekInBlock = Math.floor(positionInBlock / SESSIONS_PER_WEEK) + 1;
   const isDeload = weekInBlock === 5;
   return { weekInBlock: Math.min(weekInBlock, 5), isDeload, totalCompletedSessions: completed };
+}
+
+function ymdInZone(date: Date, timeZone?: string): string {
+  return date.toLocaleDateString("en-CA", timeZone ? { timeZone } : undefined);
+}
+
+export function detectSessionPRs(session: WorkoutSession, allSessions: WorkoutSession[]): PersonalRecord[] {
+  const prior = allSessions.filter((s) => s.id !== session.id && s.date < session.date);
+  return detectNewPRs(
+    session.performedSets.map((s) => ({
+      exerciseId: s.exerciseId,
+      weight: s.weight,
+      reps: s.reps,
+      durationSeconds: s.durationSeconds,
+    })),
+    prior
+  );
+}
+
+export function getStreakDays(
+  sessions: WorkoutSession[],
+  schedule: string[],
+  timeZone: string | undefined,
+  today: Date
+): number {
+  // session.date is already a YYYY-MM-DD string; reuse directly so we don't
+  // shift through a UTC-midnight Date and lose a day in non-UTC timezones.
+  const completedDates = new Set(
+    sessions.filter((s) => s.status === "completed").map((s) => s.date)
+  );
+
+  let cursor = new Date(today);
+  let streak = 0;
+
+  // Skip today if it's a scheduled day with no completion yet — streak should
+  // not break until a scheduled day has actually been missed in the past.
+  if (isScheduledDay(cursor, schedule, timeZone) && !completedDates.has(ymdInZone(cursor, timeZone))) {
+    cursor = new Date(cursor.getTime() - 86_400_000);
+  }
+
+  // Walk back day-by-day, only consulting scheduled days
+  for (let i = 0; i < 365; i++) {
+    if (!isScheduledDay(cursor, schedule, timeZone)) {
+      cursor = new Date(cursor.getTime() - 86_400_000);
+      continue;
+    }
+    if (completedDates.has(ymdInZone(cursor, timeZone))) {
+      streak++;
+      cursor = new Date(cursor.getTime() - 86_400_000);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+export function getMonthlySessionCount(
+  sessions: WorkoutSession[],
+  today: Date,
+  timeZone?: string
+): number {
+  const todayYmd = ymdInZone(today, timeZone);
+  const [year, month] = todayYmd.split("-");
+  const prefix = `${year}-${month}-`;
+  return sessions.filter((s) => s.status === "completed" && s.date.startsWith(prefix)).length;
+}
+
+export function getStreakRisk(
+  sessions: WorkoutSession[],
+  schedule: string[],
+  timeZone: string | undefined,
+  today: Date
+): { atRisk: boolean; streak: number } {
+  if (!isScheduledDay(today, schedule, timeZone)) return { atRisk: false, streak: 0 };
+  const todayYmd = ymdInZone(today, timeZone);
+  const completedToday = sessions.some((s) => s.status === "completed" && s.date === todayYmd);
+  if (completedToday) return { atRisk: false, streak: 0 };
+  const streak = getStreakDays(sessions, schedule, timeZone, today);
+  return { atRisk: streak >= 3, streak };
+}
+
+export type CoachFeedInput = {
+  sessions: WorkoutSession[];
+  today: Date;
+  timeZone?: string;
+  schedule: string[];
+  workout: WorkoutTemplate | null;
+  isWorkoutDay: boolean;
+  isPushedToToday: boolean;
+  isSkipped: boolean;
+  nextDay: string;
+};
+
+export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
+  const { sessions, today, timeZone, schedule, workout, isWorkoutDay, isPushedToToday, isSkipped, nextDay } = input;
+  const bubbles: CoachBubble[] = [];
+
+  const showWorkout = (isWorkoutDay || isPushedToToday) && !isSkipped;
+
+  // 1. Primary: training day or rest day framing
+  if (showWorkout && workout) {
+    const focus = workout.focus ? `${workout.title} — ${workout.focus}` : workout.title;
+    const lead = isPushedToToday
+      ? `Picked back up from yesterday. ${focus} is queued.`
+      : `Today is ${focus}. Let's get after it.`;
+    bubbles.push({
+      id: "training-cta",
+      kind: "training_cta",
+      body: lead,
+      cta: { label: "Start workout", href: "/workout" },
+    });
+  } else {
+    const restBody = isSkipped
+      ? `Moved today's session to tomorrow. Recovery is part of the program.`
+      : `Today's a rest day. Take it easy for tomorrow${nextDay ? ` — next up is ${nextDay}.` : "."}`;
+    bubbles.push({
+      id: "rest-day",
+      kind: "rest_day",
+      body: restBody,
+    });
+  }
+
+  // 2. PR / progress recap from the most recent completed session
+  const lastCompleted = [...sessions]
+    .filter((s) => s.status === "completed")
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (lastCompleted) {
+    const prs = detectSessionPRs(lastCompleted, sessions);
+    if (prs.length > 0) {
+      const noun = prs.length === 1 ? "PR" : "PRs";
+      bubbles.push({
+        id: `pr-${lastCompleted.id}`,
+        kind: "pr_progress",
+        body: `You saw real progress last workout with ${prs.length} new ${noun}. Click here to see the data.`,
+        cta: { label: "See progress", href: "/progress" },
+      });
+    }
+  }
+
+  // 3. Streak risk on a training day where today isn't done yet
+  const risk = getStreakRisk(sessions, schedule, timeZone, today);
+  if (showWorkout && risk.atRisk) {
+    bubbles.push({
+      id: "streak-risk",
+      kind: "streak_risk",
+      body: `You're on a ${risk.streak}-day streak. Don't let today be the one that breaks it.`,
+    });
+  }
+
+  // 4. Plateau / balance / recovery — borrow from existing insights but rephrase
+  if (lastCompleted) {
+    const exerciseIds = [...new Set(lastCompleted.performedSets.map((s) => s.exerciseId))];
+    for (const id of exerciseIds) {
+      const plateau = detectPlateau(id, sessions);
+      if (plateau) {
+        bubbles.push({
+          id: `plateau-${id}`,
+          kind: "plateau",
+          body: `${plateau} hasn't budged in 3 sessions. Try a drop set, change the rep range, or add a set next time.`,
+        });
+        break;
+      }
+    }
+  }
+
+  const block = getBlockStatus(sessions);
+  if (block.isDeload) {
+    bubbles.push({
+      id: "deload",
+      kind: "deload",
+      body: `Deload week. Cut load 20–30% and aim for 2 sets per exercise. Let the adaptation consolidate.`,
+    });
+  }
+
+  // 5. On rest days, still offer a way to train if the user wants to
+  if (!showWorkout && workout) {
+    bubbles.push({
+      id: "train-anyway",
+      kind: "training_cta_optional",
+      body: `Want to lift anyway? ${workout.title} — ${workout.focus} is queued up.`,
+      cta: { label: `Start ${workout.title} anyway`, href: "/workout" },
+    });
+  }
+
+  return bubbles.slice(0, 4);
 }

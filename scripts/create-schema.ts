@@ -151,6 +151,16 @@ async function createSchema() {
       created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
       dismissed_at    TIMESTAMP
     )`,
+
+    // coach_messages — persisted user replies to the coach feed (chat history)
+    `CREATE TABLE IF NOT EXISTS coach_messages (
+      id              UUID      PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_profile_id UUID      NOT NULL REFERENCES user_profiles(id),
+      role            TEXT      NOT NULL,
+      body            TEXT      NOT NULL,
+      context_kind    TEXT,
+      created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
   ];
 
   for (const stmt of statements) {

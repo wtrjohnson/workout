@@ -1,7 +1,14 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "./index";
-import { performedSets, programs, workoutSessions, workoutTemplates } from "./schema";
-import type { PlannedExercise, WorkoutSession, WorkoutTemplate } from "@/lib/training/types";
+import {
+  coachMessages,
+  performedSets,
+  programs,
+  userProfiles,
+  workoutSessions,
+  workoutTemplates,
+} from "./schema";
+import type { CoachReply, PlannedExercise, WorkoutSession, WorkoutTemplate } from "@/lib/training/types";
 
 export async function getSessionsWithSets(): Promise<WorkoutSession[]> {
   if (!db) return [];
@@ -155,6 +162,57 @@ export async function getProgram(): Promise<{ id: string; schedule: string[] } |
   if (!db) return null;
   const rows = await db.select({ id: programs.id, schedule: programs.schedule }).from(programs).limit(1);
   return rows[0] ?? null;
+}
+
+export async function getProfile(): Promise<{ id: string; trainingDaysPerWeek: number } | null> {
+  if (!db) return null;
+  const rows = await db
+    .select({ id: userProfiles.id, trainingDaysPerWeek: userProfiles.trainingDaysPerWeek })
+    .from(userProfiles)
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getRecentCoachReplies(limit = 20): Promise<CoachReply[]> {
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: coachMessages.id,
+      body: coachMessages.body,
+      contextKind: coachMessages.contextKind,
+      createdAt: coachMessages.createdAt,
+    })
+    .from(coachMessages)
+    .where(eq(coachMessages.role, "user"))
+    .orderBy(desc(coachMessages.createdAt))
+    .limit(limit);
+
+  return rows
+    .map((row) => ({
+      id: row.id,
+      body: row.body,
+      contextKind: row.contextKind ?? null,
+      createdAt: row.createdAt.toISOString(),
+    }))
+    .reverse();
+}
+
+export async function insertCoachReply({
+  body,
+  contextKind,
+}: {
+  body: string;
+  contextKind?: string | null;
+}): Promise<void> {
+  if (!db) return;
+  const profile = await getProfile();
+  if (!profile) return;
+  await db.insert(coachMessages).values({
+    userProfileId: profile.id,
+    role: "user",
+    body,
+    contextKind: contextKind ?? null,
+  });
 }
 
 export async function getTemplates(): Promise<WorkoutTemplate[]> {

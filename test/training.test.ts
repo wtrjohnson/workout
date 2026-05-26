@@ -4,16 +4,21 @@ import {
   calculateRecovery,
   calculateWeeklyMuscleVolume,
   buildWorkoutSteps,
+  detectSessionPRs,
   findSubstitutions,
+  generateCoachFeed,
   generateInsights,
   getExerciseStats,
+  getMonthlySessionCount,
   getNextTemplate,
   getRestSeconds,
+  getStreakDays,
   getSuggestedSet,
   getTodayWorkout,
   getWeeklySummary,
   suggestProgression
 } from "@/lib/training/logic";
+import type { WorkoutSession, WorkoutTemplate } from "@/lib/training/types";
 
 describe("training rules", () => {
   it("selects a planned full-body workout", () => {
@@ -159,5 +164,117 @@ describe("seed data quality", () => {
         expect(ids.has(muscle)).toBe(true);
       }
     }
+  });
+});
+
+describe("adaptive home page logic", () => {
+  const SCHEDULE = ["Monday", "Wednesday", "Friday"];
+  const TZ = "America/New_York";
+
+  function session(date: string, status: "completed" | "missed", sets: Array<{ exerciseId: string; weight: number; reps: number }> = []): WorkoutSession {
+    return {
+      id: `s-${date}`,
+      templateId: "t",
+      date,
+      status,
+      performedSets: sets.map((s, i) => ({ ...s, setNumber: i + 1, date })),
+    };
+  }
+
+  it("getStreakDays counts consecutive completed scheduled days back from today", () => {
+    // Friday May 22, Wed May 20, Mon May 18 — all scheduled completed days leading into Mon May 25
+    const sessions = [
+      session("2026-05-18", "completed", [{ exerciseId: "lat-pulldown", weight: 100, reps: 10 }]),
+      session("2026-05-20", "completed", [{ exerciseId: "lat-pulldown", weight: 100, reps: 10 }]),
+      session("2026-05-22", "completed", [{ exerciseId: "lat-pulldown", weight: 100, reps: 10 }]),
+      session("2026-05-25", "completed", [{ exerciseId: "lat-pulldown", weight: 100, reps: 10 }]),
+    ];
+    // Tuesday 2026-05-26 — today is a rest day; streak should include the 4 prior completed scheduled days
+    const today = new Date("2026-05-26T12:00:00");
+    expect(getStreakDays(sessions, SCHEDULE, TZ, today)).toBe(4);
+  });
+
+  it("getStreakDays breaks when a scheduled day was missed", () => {
+    const sessions = [
+      session("2026-05-18", "completed", []),
+      // Wed 2026-05-20 missed
+      session("2026-05-22", "completed", []),
+    ];
+    const today = new Date("2026-05-23T12:00:00"); // Saturday — rest day
+    expect(getStreakDays(sessions, SCHEDULE, TZ, today)).toBe(1);
+  });
+
+  it("getMonthlySessionCount counts completed sessions in the current calendar month", () => {
+    const sessions = [
+      session("2026-04-30", "completed", []),
+      session("2026-05-04", "completed", []),
+      session("2026-05-11", "completed", []),
+      session("2026-05-25", "missed", []),
+    ];
+    const today = new Date("2026-05-26T12:00:00");
+    expect(getMonthlySessionCount(sessions, today, TZ)).toBe(2);
+  });
+
+  it("detectSessionPRs returns a PR when weight beats every prior session", () => {
+    const sessions = [
+      session("2026-05-18", "completed", [{ exerciseId: "lat-pulldown", weight: 100, reps: 10 }]),
+      session("2026-05-20", "completed", [{ exerciseId: "lat-pulldown", weight: 110, reps: 8 }]),
+    ];
+    const prs = detectSessionPRs(sessions[1], sessions);
+    expect(prs).toHaveLength(1);
+    expect(prs[0]).toMatchObject({ exerciseId: "lat-pulldown", type: "weight", value: 110 });
+  });
+
+  it("generateCoachFeed leads with a training CTA on a scheduled workout day", () => {
+    const workout: WorkoutTemplate = workoutTemplates[0];
+    const bubbles = generateCoachFeed({
+      sessions: [],
+      today: new Date("2026-05-25T12:00:00"), // Monday — scheduled
+      timeZone: TZ,
+      schedule: SCHEDULE,
+      workout,
+      isWorkoutDay: true,
+      isPushedToToday: false,
+      isSkipped: false,
+      nextDay: "Wednesday",
+    });
+    expect(bubbles[0].kind).toBe("training_cta");
+    expect(bubbles[0].cta?.href).toBe("/workout");
+  });
+
+  it("generateCoachFeed leads with a rest-day bubble and offers an optional CTA on a rest day", () => {
+    const workout: WorkoutTemplate = workoutTemplates[0];
+    const bubbles = generateCoachFeed({
+      sessions: [],
+      today: new Date("2026-05-26T12:00:00"), // Tuesday — not scheduled
+      timeZone: TZ,
+      schedule: SCHEDULE,
+      workout,
+      isWorkoutDay: false,
+      isPushedToToday: false,
+      isSkipped: false,
+      nextDay: "Wednesday",
+    });
+    expect(bubbles[0].kind).toBe("rest_day");
+    expect(bubbles.some((b) => b.kind === "training_cta_optional")).toBe(true);
+  });
+
+  it("generateCoachFeed surfaces a PR_progress bubble after a PR session", () => {
+    const sessions = [
+      session("2026-05-18", "completed", [{ exerciseId: "lat-pulldown", weight: 100, reps: 10 }]),
+      session("2026-05-25", "completed", [{ exerciseId: "lat-pulldown", weight: 115, reps: 8 }]),
+    ];
+    const bubbles = generateCoachFeed({
+      sessions,
+      today: new Date("2026-05-26T12:00:00"),
+      timeZone: TZ,
+      schedule: SCHEDULE,
+      workout: workoutTemplates[0],
+      isWorkoutDay: false,
+      isPushedToToday: false,
+      isSkipped: false,
+      nextDay: "Wednesday",
+    });
+    expect(bubbles.some((b) => b.kind === "pr_progress")).toBe(true);
   });
 });
