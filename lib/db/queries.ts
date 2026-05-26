@@ -175,26 +175,33 @@ export async function getProfile(): Promise<{ id: string; trainingDaysPerWeek: n
 
 export async function getRecentCoachReplies(limit = 20): Promise<CoachReply[]> {
   if (!db) return [];
-  const rows = await db
-    .select({
-      id: coachMessages.id,
-      body: coachMessages.body,
-      contextKind: coachMessages.contextKind,
-      createdAt: coachMessages.createdAt,
-    })
-    .from(coachMessages)
-    .where(eq(coachMessages.role, "user"))
-    .orderBy(desc(coachMessages.createdAt))
-    .limit(limit);
+  try {
+    const rows = await db
+      .select({
+        id: coachMessages.id,
+        body: coachMessages.body,
+        contextKind: coachMessages.contextKind,
+        createdAt: coachMessages.createdAt,
+      })
+      .from(coachMessages)
+      .where(eq(coachMessages.role, "user"))
+      .orderBy(desc(coachMessages.createdAt))
+      .limit(limit);
 
-  return rows
-    .map((row) => ({
-      id: row.id,
-      body: row.body,
-      contextKind: row.contextKind ?? null,
-      createdAt: row.createdAt.toISOString(),
-    }))
-    .reverse();
+    return rows
+      .map((row) => ({
+        id: row.id,
+        body: row.body,
+        contextKind: row.contextKind ?? null,
+        createdAt: row.createdAt.toISOString(),
+      }))
+      .reverse();
+  } catch (err) {
+    // Table may not exist yet (run `npm run db:push`). Degrade gracefully
+    // so the home page still renders without chat history.
+    console.warn("getRecentCoachReplies failed:", err);
+    return [];
+  }
 }
 
 export async function insertCoachReply({
@@ -207,12 +214,16 @@ export async function insertCoachReply({
   if (!db) return;
   const profile = await getProfile();
   if (!profile) return;
-  await db.insert(coachMessages).values({
-    userProfileId: profile.id,
-    role: "user",
-    body,
-    contextKind: contextKind ?? null,
-  });
+  try {
+    await db.insert(coachMessages).values({
+      userProfileId: profile.id,
+      role: "user",
+      body,
+      contextKind: contextKind ?? null,
+    });
+  } catch (err) {
+    console.warn("insertCoachReply failed:", err);
+  }
 }
 
 export async function getTemplates(): Promise<WorkoutTemplate[]> {
