@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import { exercises, muscles, workoutTemplates } from "./data";
 import type {
   CoachBubble,
@@ -827,7 +828,7 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
       id: "training-cta",
       kind: "training_cta",
       body: lead,
-      cta: { label: "Start workout", href: "/workout" },
+      cta: { label: "Start workout", href: `/workout?templateId=${workout.id}` as Route },
     });
   } else {
     const restBody = isSkipped
@@ -898,7 +899,7 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
       id: "train-anyway",
       kind: "training_cta_optional",
       body: `Want to lift anyway? ${workout.title} — ${workout.focus} is queued up.`,
-      cta: { label: `Start ${workout.title} anyway`, href: "/workout" },
+      cta: { label: `Start ${workout.title} anyway`, href: `/workout?templateId=${workout.id}` as Route },
     });
   }
 

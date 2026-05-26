@@ -4,9 +4,18 @@ import { WorkoutLogger } from "@/components/workout-logger";
 import { getSessionsWithSets, getTemplates } from "@/lib/db/queries";
 import { getNextTemplate } from "@/lib/training/logic";
 
-export default async function WorkoutPage() {
-  const [sessions, templates] = await Promise.all([getSessionsWithSets(), getTemplates()]);
-  const workout = templates.length > 0 ? getNextTemplate(sessions, templates) : null;
+export default async function WorkoutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ templateId?: string }>;
+}) {
+  const [{ templateId }, sessions, templates] = await Promise.all([
+    searchParams,
+    getSessionsWithSets(),
+    getTemplates(),
+  ]);
+  const explicit = templateId ? templates.find((t) => t.id === templateId) : null;
+  const workout = explicit ?? (templates.length > 0 ? getNextTemplate(sessions, templates) : null);
 
   if (!workout) {
     return (
