@@ -46,7 +46,7 @@ export default async function HomePage() {
   const isPushedToToday = pushedToRaw === todayStr;
   const workout = templates.length > 0 ? getNextTemplate(sessions, templates) : null;
   const missedWorkout = templates.length > 0 ? getAvailableMissedWorkout(sessions, templates) : null;
-  const isMissedWorkout = workout && missedWorkout && workout.id === missedWorkout.id;
+  const isMissedWorkout = workout && missedWorkout && workout.id === missedWorkout.id ? true : undefined;
   const nextDay = getNextScheduledDay(today, schedule, timeZone);
 
   const bubbles = generateCoachFeed({
