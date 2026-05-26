@@ -239,7 +239,7 @@ describe("adaptive home page logic", () => {
       nextDay: "Wednesday",
     });
     expect(bubbles[0].kind).toBe("training_cta");
-    expect(bubbles[0].cta?.href).toBe("/workout");
+    expect(bubbles[0].cta?.href).toMatch(/^\/workout\?templateId=/);
   });
 
   it("generateCoachFeed leads with a rest-day bubble and offers an optional CTA on a rest day", () => {

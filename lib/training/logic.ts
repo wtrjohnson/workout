@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import { exercises, muscles, workoutTemplates } from "./data";
 import type {
   CoachBubble,
@@ -924,7 +925,7 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
       id: "training-cta",
       kind: "training_cta",
       body: lead,
-      cta: { label: "Start workout", href: "/workout" },
+      cta: { label: "Start workout", href: `/workout?templateId=${workout.id}` as Route },
     });
   } else {
     const restBody = isSkipped
@@ -989,8 +990,9 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
     });
   }
 
-  // 5. On rest days, still offer a way to train if the user wants to
-  // OR on missed workout days, offer the option to skip and do today's scheduled workout instead
+  // 5. On rest days, still offer a way to train if the user wants to.
+  //    On missed-workout days, offer the option to skip the catch-up and do
+  //    today's scheduled workout instead.
   if ((!showWorkout || isMissedWorkout) && workout) {
     const normalWorkout = isMissedWorkout
       ? getNextTemplateSkippingMissed(sessions, templates, today)
@@ -1001,14 +1003,14 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
         id: "skip-catch-up",
         kind: "training_cta_optional",
         body: `Or skip the catch-up? ${normalWorkout.title} — ${normalWorkout.focus} is also queued up.`,
-        cta: { label: `Do today's workout instead`, href: "/workout?skipMissed=true" },
+        cta: { label: `Do today's workout instead`, href: `/workout?templateId=${normalWorkout.id}` as Route },
       });
     } else if (!showWorkout) {
       bubbles.push({
         id: "train-anyway",
         kind: "training_cta_optional",
         body: `Want to lift anyway? ${workout.title} — ${workout.focus} is queued up.`,
-        cta: { label: `Start ${workout.title} anyway`, href: "/workout" },
+        cta: { label: `Start ${workout.title} anyway`, href: `/workout?templateId=${workout.id}` as Route },
       });
     }
   }
