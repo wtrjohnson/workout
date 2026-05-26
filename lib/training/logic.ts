@@ -21,31 +21,62 @@ export function getTodayWorkout(date = new Date(), templates = workoutTemplates)
   return templates[dayIndex % templates.length];
 }
 
-function getMissedWorkout(sessions: WorkoutSession[], templates: WorkoutTemplate[], today = new Date()): WorkoutTemplate | null {
-  // Look for missed workouts from the last 3 days
+function getMissedWorkout(
+  sessions: WorkoutSession[],
+  templates: WorkoutTemplate[],
+  schedule: string[],
+  today = new Date(),
+  timeZone?: string
+): WorkoutTemplate | null {
+  // Check for unlogged scheduled training days in the last 3 days
   const threeDaysAgo = new Date(today);
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-  const missedSessions = sessions
-    .filter((s) => s.status === "missed" && new Date(s.date) >= threeDaysAgo)
-    .sort((a, b) => b.date.localeCompare(a.date)); // Most recent first
+  const loggedDates = new Set(sessions.map((s) => s.date));
 
-  if (missedSessions.length === 0) return null;
+  // Work backwards from yesterday to find the most recent missed training day
+  const cursor = new Date(today);
+  cursor.setDate(cursor.getDate() - 1); // Start with yesterday
 
-  const mostRecentMissed = missedSessions[0];
-  const template = templates.find((t) => t.id === mostRecentMissed.templateId);
-  return template ?? null;
+  for (let i = 0; i < 3; i++) {
+    const dateStr = cursor.toLocaleDateString("en-CA", { timeZone });
+    const dayName = cursor.toLocaleDateString("en-US", { weekday: "long", ...(timeZone ? { timeZone } : {}) });
+
+    // If it was a scheduled training day and no workout was logged
+    if (schedule.includes(dayName) && !loggedDates.has(dateStr)) {
+      // Return the workout that should have been done that day
+      const completed = sessions.filter((s) => s.status === "completed" && new Date(s.date) < cursor).length;
+      const expectedIndex = completed % templates.length;
+      return templates[expectedIndex];
+    }
+
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return null;
 }
 
-export function getAvailableMissedWorkout(sessions: WorkoutSession[], templates: WorkoutTemplate[], today = new Date()): WorkoutTemplate | null {
-  return getMissedWorkout(sessions, templates, today);
+export function getAvailableMissedWorkout(
+  sessions: WorkoutSession[],
+  templates: WorkoutTemplate[],
+  schedule: string[],
+  today = new Date(),
+  timeZone?: string
+): WorkoutTemplate | null {
+  return getMissedWorkout(sessions, templates, schedule, today, timeZone);
 }
 
-export function getNextTemplate(sessions: WorkoutSession[], templates: WorkoutTemplate[], today = new Date()): WorkoutTemplate {
+export function getNextTemplate(
+  sessions: WorkoutSession[],
+  templates: WorkoutTemplate[],
+  today = new Date(),
+  schedule: string[] = [],
+  timeZone?: string
+): WorkoutTemplate {
   if (templates.length === 0) throw new Error("No templates available");
 
   // Check if there's a missed workout to catch up on
-  const missedWorkout = getMissedWorkout(sessions, templates, today);
+  const missedWorkout = getMissedWorkout(sessions, templates, schedule, today, timeZone);
   if (missedWorkout) return missedWorkout;
 
   const completed = sessions.filter((s) => s.status === "completed").length;
