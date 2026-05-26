@@ -14,6 +14,7 @@ import {
 } from "@/lib/db/queries";
 import {
   generateCoachFeed,
+  getAvailableMissedWorkout,
   getMonthlySessionCount,
   getNextScheduledDay,
   getNextTemplate,
@@ -43,7 +44,9 @@ export default async function HomePage() {
   const isSkipped = cookieStore.get("workout_skipped")?.value === todayStr;
   const pushedToRaw = cookieStore.get("workout_pushed_to")?.value ?? null;
   const isPushedToToday = pushedToRaw === todayStr;
-  const workout = templates.length > 0 ? getNextTemplate(sessions, templates) : null;
+  const workout = templates.length > 0 ? getNextTemplate(sessions, templates, today, schedule, timeZone) : null;
+  const missedWorkout = templates.length > 0 ? getAvailableMissedWorkout(sessions, templates, schedule, today, timeZone) : null;
+  const isMissedWorkout = workout && missedWorkout && workout.id === missedWorkout.id ? true : undefined;
   const nextDay = getNextScheduledDay(today, schedule, timeZone);
 
   const bubbles = generateCoachFeed({
@@ -56,6 +59,8 @@ export default async function HomePage() {
     isPushedToToday,
     isSkipped,
     nextDay,
+    isMissedWorkout,
+    templates,
   });
 
   const weeklySummary = getWeeklySummary(sessions, today);

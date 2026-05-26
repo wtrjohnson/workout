@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
+import { headers } from "next/headers";
 import { WorkoutLogger } from "@/components/workout-logger";
-import { getSessionsWithSets, getTemplates } from "@/lib/db/queries";
+import { getProgram, getSessionsWithSets, getTemplates } from "@/lib/db/queries";
 import { getNextTemplate } from "@/lib/training/logic";
 
 export default async function WorkoutPage({
@@ -9,13 +10,17 @@ export default async function WorkoutPage({
 }: {
   searchParams: Promise<{ templateId?: string }>;
 }) {
-  const [{ templateId }, sessions, templates] = await Promise.all([
+  const [{ templateId }, sessions, templates, program, headersList] = await Promise.all([
     searchParams,
     getSessionsWithSets(),
     getTemplates(),
+    getProgram(),
+    headers(),
   ]);
+  const timeZone = headersList.get("x-vercel-ip-timezone") ?? "America/New_York";
+  const schedule = program?.schedule ?? [];
   const explicit = templateId ? templates.find((t) => t.id === templateId) : null;
-  const workout = explicit ?? (templates.length > 0 ? getNextTemplate(sessions, templates) : null);
+  const workout = explicit ?? (templates.length > 0 ? getNextTemplate(sessions, templates, new Date(), schedule, timeZone) : null);
 
   if (!workout) {
     return (

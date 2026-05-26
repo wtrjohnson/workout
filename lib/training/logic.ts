@@ -22,8 +22,63 @@ export function getTodayWorkout(date = new Date(), templates = workoutTemplates)
   return templates[dayIndex % templates.length];
 }
 
-export function getNextTemplate(sessions: WorkoutSession[], templates: WorkoutTemplate[], today = new Date()): WorkoutTemplate {
+function getMissedWorkout(
+  sessions: WorkoutSession[],
+  templates: WorkoutTemplate[],
+  schedule: string[],
+  today = new Date(),
+  timeZone?: string
+): WorkoutTemplate | null {
+  // Check for unlogged scheduled training days in the last 3 days
+  const threeDaysAgo = new Date(today);
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+  const loggedDates = new Set(sessions.map((s) => s.date));
+
+  // Work backwards from yesterday to find the most recent missed training day
+  const cursor = new Date(today);
+  cursor.setDate(cursor.getDate() - 1); // Start with yesterday
+
+  for (let i = 0; i < 3; i++) {
+    const dateStr = cursor.toLocaleDateString("en-CA", { timeZone });
+    const dayName = cursor.toLocaleDateString("en-US", { weekday: "long", ...(timeZone ? { timeZone } : {}) });
+
+    // If it was a scheduled training day and no workout was logged
+    if (schedule.includes(dayName) && !loggedDates.has(dateStr)) {
+      // Return the workout that should have been done that day
+      const completed = sessions.filter((s) => s.status === "completed" && new Date(s.date) < cursor).length;
+      const expectedIndex = completed % templates.length;
+      return templates[expectedIndex];
+    }
+
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return null;
+}
+
+export function getAvailableMissedWorkout(
+  sessions: WorkoutSession[],
+  templates: WorkoutTemplate[],
+  schedule: string[],
+  today = new Date(),
+  timeZone?: string
+): WorkoutTemplate | null {
+  return getMissedWorkout(sessions, templates, schedule, today, timeZone);
+}
+
+export function getNextTemplate(
+  sessions: WorkoutSession[],
+  templates: WorkoutTemplate[],
+  today = new Date(),
+  schedule: string[] = [],
+  timeZone?: string
+): WorkoutTemplate {
   if (templates.length === 0) throw new Error("No templates available");
+
+  // Check if there's a missed workout to catch up on
+  const missedWorkout = getMissedWorkout(sessions, templates, schedule, today, timeZone);
+  if (missedWorkout) return missedWorkout;
 
   const completed = sessions.filter((s) => s.status === "completed").length;
   const expectedIndex = completed % templates.length;
@@ -800,6 +855,39 @@ export function getStreakRisk(
   return { atRisk: streak >= 3, streak };
 }
 
+function getNextTemplateSkippingMissed(sessions: WorkoutSession[], templates: WorkoutTemplate[], today = new Date()): WorkoutTemplate | null {
+  // Get the normal next template, bypassing missed workout logic
+  if (templates.length === 0) return null;
+
+  const completed = sessions.filter((s) => s.status === "completed").length;
+  const expectedIndex = completed % templates.length;
+
+  const recovery = calculateRecovery(sessions, today);
+  const recoveryByMuscle = new Map(recovery.map((r) => [r.muscleId, r.score]));
+
+  function templateRecoveryScore(template: WorkoutTemplate): number {
+    const muscleIds = new Set(
+      template.exercises.flatMap((ex) => exerciseById.get(ex.exerciseId)?.primaryMuscles ?? [])
+    );
+    if (muscleIds.size === 0) return 100;
+    let total = 0;
+    for (const id of muscleIds) total += recoveryByMuscle.get(id) ?? 100;
+    return total / muscleIds.size;
+  }
+
+  const expected = templates[expectedIndex];
+  const READY_THRESHOLD = 60;
+  if (templateRecoveryScore(expected) >= READY_THRESHOLD) return expected;
+
+  return [...templates]
+    .map((t, i) => ({
+      template: t,
+      score: templateRecoveryScore(t),
+      distance: (i - expectedIndex + templates.length) % templates.length
+    }))
+    .sort((a, b) => b.score - a.score || a.distance - b.distance)[0].template;
+}
+
 export type CoachFeedInput = {
   sessions: WorkoutSession[];
   today: Date;
@@ -810,20 +898,29 @@ export type CoachFeedInput = {
   isPushedToToday: boolean;
   isSkipped: boolean;
   nextDay: string;
+  isMissedWorkout?: boolean;
+  templates?: WorkoutTemplate[];
 };
 
 export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
-  const { sessions, today, timeZone, schedule, workout, isWorkoutDay, isPushedToToday, isSkipped, nextDay } = input;
+  const { sessions, today, timeZone, schedule, workout, isWorkoutDay, isPushedToToday, isSkipped, nextDay, isMissedWorkout, templates = [] } = input;
   const bubbles: CoachBubble[] = [];
 
-  const showWorkout = (isWorkoutDay || isPushedToToday) && !isSkipped;
+  const showWorkout = (isWorkoutDay || isPushedToToday || isMissedWorkout) && !isSkipped;
 
   // 1. Primary: training day or rest day framing
   if (showWorkout && workout) {
     const focus = workout.focus ? `${workout.title} — ${workout.focus}` : workout.title;
-    const lead = isPushedToToday
-      ? `Picked back up from yesterday. ${focus} is queued.`
-      : `Today is ${focus}. Let's get after it.`;
+    let lead: string;
+
+    if (isMissedWorkout) {
+      lead = `Catch up: ${focus}. Doing the missed workout helps keep the program on track.`;
+    } else if (isPushedToToday) {
+      lead = `Picked back up from yesterday. ${focus} is queued.`;
+    } else {
+      lead = `Today is ${focus}. Let's get after it.`;
+    }
+
     bubbles.push({
       id: "training-cta",
       kind: "training_cta",
@@ -893,14 +990,29 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
     });
   }
 
-  // 5. On rest days, still offer a way to train if the user wants to
-  if (!showWorkout && workout) {
-    bubbles.push({
-      id: "train-anyway",
-      kind: "training_cta_optional",
-      body: `Want to lift anyway? ${workout.title} — ${workout.focus} is queued up.`,
-      cta: { label: `Start ${workout.title} anyway`, href: `/workout?templateId=${workout.id}` as Route },
-    });
+  // 5. On rest days, still offer a way to train if the user wants to.
+  //    On missed-workout days, offer the option to skip the catch-up and do
+  //    today's scheduled workout instead.
+  if ((!showWorkout || isMissedWorkout) && workout) {
+    const normalWorkout = isMissedWorkout
+      ? getNextTemplateSkippingMissed(sessions, templates, today)
+      : workout;
+
+    if (isMissedWorkout && normalWorkout && normalWorkout.id !== workout.id) {
+      bubbles.push({
+        id: "skip-catch-up",
+        kind: "training_cta_optional",
+        body: `Or skip the catch-up? ${normalWorkout.title} — ${normalWorkout.focus} is also queued up.`,
+        cta: { label: `Do today's workout instead`, href: `/workout?templateId=${normalWorkout.id}` as Route },
+      });
+    } else if (!showWorkout) {
+      bubbles.push({
+        id: "train-anyway",
+        kind: "training_cta_optional",
+        body: `Want to lift anyway? ${workout.title} — ${workout.focus} is queued up.`,
+        cta: { label: `Start ${workout.title} anyway`, href: `/workout?templateId=${workout.id}` as Route },
+      });
+    }
   }
 
   return bubbles.slice(0, 4);
