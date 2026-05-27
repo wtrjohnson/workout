@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp, Clock, List, Repeat2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
 import {
   buildWorkoutSteps,
@@ -107,6 +107,8 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   const [timerActive, setTimerActive] = useState(false);
   const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
   const [timerElapsed, setTimerElapsed] = useState(0);
+
+  const goToNextStepRef = useRef<() => void>(() => {});
 
   if (steps.length === 0) {
     return (
@@ -221,6 +223,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     setActiveStepIndex((current) => current + 1);
     setMode("active");
   }
+  goToNextStepRef.current = goToNextStep;
 
   // Anchored rest interval
   useEffect(() => {
@@ -229,7 +232,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     function tick() {
       const remaining = Math.max(0, Math.round((restEndTime! - Date.now()) / 1000));
       setRemainingRest(remaining);
-      if (remaining <= 0) goToNextStep();
+      if (remaining <= 0) goToNextStepRef.current();
     }
 
     tick();
@@ -244,7 +247,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
       if (document.visibilityState === "visible") {
         const remaining = Math.max(0, Math.round((restEndTime! - Date.now()) / 1000));
         setRemainingRest(remaining);
-        if (remaining <= 0) goToNextStep();
+        if (remaining <= 0) goToNextStepRef.current();
       }
     }
 
