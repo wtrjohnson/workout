@@ -43,12 +43,19 @@ function getMissedWorkout(
     const dateStr = cursor.toLocaleDateString("en-CA", { timeZone });
     const dayName = cursor.toLocaleDateString("en-US", { weekday: "long", ...(timeZone ? { timeZone } : {}) });
 
-    // If it was a scheduled training day and no workout was logged
+    // If it was a scheduled training day and no workout was logged on that date
     if (schedule.includes(dayName) && !loggedDates.has(dateStr)) {
-      // Return the workout that should have been done that day
-      const completed = sessions.filter((s) => s.status === "completed" && new Date(s.date) < cursor).length;
-      const expectedIndex = completed % templates.length;
-      return templates[expectedIndex];
+      // If the user caught up on a non-scheduled day after this missed day, the
+      // rotation has already advanced — don't treat it as still-missed.
+      const caughtUpAfter = sessions.some((s) => {
+        const d = new Date(s.date);
+        return s.status === "completed" && d > cursor && d < today;
+      });
+      if (!caughtUpAfter) {
+        const completed = sessions.filter((s) => s.status === "completed" && new Date(s.date) < cursor).length;
+        const expectedIndex = completed % templates.length;
+        return templates[expectedIndex];
+      }
     }
 
     cursor.setDate(cursor.getDate() - 1);
