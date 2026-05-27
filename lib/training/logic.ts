@@ -953,7 +953,7 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
       bubbles.push({
         id: `pr-${lastCompleted.id}`,
         kind: "pr_progress",
-        body: `You saw real progress last workout with ${prs.length} new ${noun}. Click here to see the data.`,
+        body: `${prs.length} new ${noun} from your last session — tap to review your progress.`,
         cta: { label: "See progress", href: "/progress" },
       });
     }
@@ -1019,5 +1019,5 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
     }
   }
 
-  return bubbles.slice(0, 4);
+  return bubbles.slice(0, 3);
 }
