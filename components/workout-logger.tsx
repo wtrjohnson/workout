@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp, Clock, List, Repeat2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SelectableChip } from "@/components/selectable-chip";
 import {
   buildWorkoutSteps,
