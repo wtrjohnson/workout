@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { performedSets, userProfiles, workoutSessions } from "@/lib/db/schema";
@@ -56,5 +57,6 @@ export async function POST(request: Request) {
     );
   }
 
+  revalidatePath("/");
   return NextResponse.json({ sessionId: session.id });
 }

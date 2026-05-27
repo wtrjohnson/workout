@@ -108,6 +108,8 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
   const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
   const [timerElapsed, setTimerElapsed] = useState(0);
 
+  const goToNextStepRef = useRef<() => void>(() => {});
+
   if (steps.length === 0) {
     return (
       <div className="rounded-3xl border border-black/6 bg-white p-5 shadow-card">
@@ -221,6 +223,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     setActiveStepIndex((current) => current + 1);
     setMode("active");
   }
+  goToNextStepRef.current = goToNextStep;
 
   // Anchored rest interval
   useEffect(() => {
@@ -229,7 +232,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
     function tick() {
       const remaining = Math.max(0, Math.round((restEndTime! - Date.now()) / 1000));
       setRemainingRest(remaining);
-      if (remaining <= 0) goToNextStep();
+      if (remaining <= 0) goToNextStepRef.current();
     }
 
     tick();
@@ -244,7 +247,7 @@ export function WorkoutLogger({ workout, sessions }: { workout: WorkoutTemplate;
       if (document.visibilityState === "visible") {
         const remaining = Math.max(0, Math.round((restEndTime! - Date.now()) / 1000));
         setRemainingRest(remaining);
-        if (remaining <= 0) goToNextStep();
+        if (remaining <= 0) goToNextStepRef.current();
       }
     }
 

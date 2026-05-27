@@ -906,7 +906,9 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
   const { sessions, today, timeZone, schedule, workout, isWorkoutDay, isPushedToToday, isSkipped, nextDay, isMissedWorkout, templates = [] } = input;
   const bubbles: CoachBubble[] = [];
 
-  const showWorkout = (isWorkoutDay || isPushedToToday || isMissedWorkout) && !isSkipped;
+  const todayStr = today.toLocaleDateString("en-CA", { timeZone });
+  const completedToday = sessions.some((s) => s.date === todayStr && s.status === "completed");
+  const showWorkout = !completedToday && (isWorkoutDay || isPushedToToday || isMissedWorkout) && !isSkipped;
 
   // 1. Primary: training day or rest day framing
   if (showWorkout && workout) {
@@ -928,9 +930,11 @@ export function generateCoachFeed(input: CoachFeedInput): CoachBubble[] {
       cta: { label: "Start workout", href: `/workout?templateId=${workout.id}` as Route },
     });
   } else {
-    const restBody = isSkipped
-      ? `Moved today's session to tomorrow. Recovery is part of the program.`
-      : `Today's a rest day. Take it easy for tomorrow${nextDay ? ` — next up is ${nextDay}.` : "."}`;
+    const restBody = completedToday
+      ? `Nice work today. Recovery starts now${nextDay ? ` — next up is ${nextDay}` : ""}.`
+      : isSkipped
+        ? `Moved today's session to tomorrow. Recovery is part of the program.`
+        : `Today's a rest day. Take it easy for tomorrow${nextDay ? ` — next up is ${nextDay}.` : "."}`;
     bubbles.push({
       id: "rest-day",
       kind: "rest_day",
