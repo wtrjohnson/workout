@@ -8,6 +8,7 @@ import {
   findSubstitutions,
   generateCoachFeed,
   generateInsights,
+  getAvailableMissedWorkout,
   getExerciseStats,
   getMonthlySessionCount,
   getNextTemplate,
@@ -134,6 +135,27 @@ describe("getNextTemplate", () => {
 
   it("throws when no templates are available", () => {
     expect(() => getNextTemplate(demoSessions, [])).toThrow("No templates available");
+  });
+
+  it("shows Day B on Wednesday when Monday was missed but caught up on Tuesday", () => {
+    // Schedule: Mon/Wed/Fri. User missed Monday (2026-05-25) but completed Day A on Tuesday (2026-05-26).
+    // On Wednesday (2026-05-27) the feed should show Day B, not "Catch up: Day A".
+    const SCHEDULE = ["Monday", "Wednesday", "Friday"];
+    const TZ = "America/New_York";
+    const sessions: WorkoutSession[] = [
+      {
+        id: "s-tue",
+        templateId: workoutTemplates[0].id,
+        date: "2026-05-26", // Tuesday catch-up
+        status: "completed",
+        performedSets: [],
+      },
+    ];
+    const wednesday = new Date("2026-05-27T12:00:00");
+    const missed = getAvailableMissedWorkout(sessions, workoutTemplates, SCHEDULE, wednesday, TZ);
+    const next = getNextTemplate(sessions, workoutTemplates, wednesday, SCHEDULE, TZ);
+    expect(missed).toBeNull();
+    expect(next.day).toBe("B");
   });
 });
 
